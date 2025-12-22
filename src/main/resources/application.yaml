@@ -1,0 +1,100 @@
+server:
+    port: 8083
+
+spring:
+    application:
+        name: notification-service
+
+    datasource:
+        url: jdbc:postgresql://localhost:5432/planify
+        username: planify
+        password: planify
+        driver-class-name: org.postgresql.Driver
+        hikari:
+            maximum-pool-size: 5
+            minimum-idle: 2
+            connection-timeout: 30000
+            idle-timeout: 600000
+            max-lifetime: 1800000
+
+    jpa:
+        hibernate:
+            ddl-auto: validate
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+                default_schema: notification
+        show-sql: false
+
+    flyway:
+        enabled: true
+        schemas: notification
+        default-schema: notification
+        create-schemas: true
+
+    kafka:
+        bootstrap-servers: localhost:9092
+        consumer:
+            group-id: notification-service
+            auto-offset-reset: latest
+            key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        producer:
+            key-serializer: org.apache.kafka.common.serialization.StringSerializer
+            value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    # Preferred: issuer URI so Spring can auto-configure JwtDecoder
+                    issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:9080/realms/planify}
+                    # Fallback: direct JWK Set URI (kept for flexibility). Must match your Keycloak host/port.
+                    jwk-set-uri: ${OAUTH2_JWK_SET_URI:http://localhost:9080/realms/planify/protocol/openid-connect/certs}
+
+# SendGrid Configuration
+sendgrid:
+    api-key: ${SENDGRID_API_KEY}
+    from-email: katarinagojkovick@gmail.com
+    from-name: Planify Events
+
+# Twilio Configuration
+twilio:
+    account-sid: ${TWILIO_ACCOUNT_SID:your-twilio-account-sid}
+    auth-token: ${TWILIO_AUTH_TOKEN:your-twilio-auth-token}
+    phone-number: ${TWILIO_PHONE_NUMBER:+1234567890}
+
+# AWS Configuration
+aws:
+    region: ${AWS_REGION:eu-central-1}
+    lambda:
+        function-name: planify-reminder-scheduler
+
+# Notification Settings
+notification:
+    email:
+        enabled: true
+        retry-attempts: 3
+    sms:
+        enabled: true
+        retry-attempts: 3
+    websocket:
+        enabled: true
+    reminder:
+        check-interval-minutes: 30
+        advance-notice-hours: 24
+
+# Kafka Topics
+kafka:
+    topics:
+        join-request-sent: ${KAFKA_TOPIC_JOIN_REQUESTS:user.join-request-sent}
+        join-request-responded: ${KAFKA_TOPIC_JOIN_REQUESTS:user.join-request-responded}
+        invitation-sent: ${KAFKA_TOPIC_INVITATIONS:user.invitation-sent}
+        invitation-responded: ${KAFKA_TOPIC_INVITATIONS:user.invitation-responded}
+
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health,info,metrics,prometheus
+    endpoint:
+        health:
+            show-details: always
