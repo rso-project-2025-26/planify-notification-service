@@ -26,7 +26,7 @@ public class ReminderScheduler {
     public void checkAndSendReminders() {
         log.info("Running scheduled reminder check");
         try {
-//            notificationService.sendScheduledReminders(); TODO implementiraj opomnike
+            notificationService.sendScheduledReminders();
             log.info("Scheduled reminder check completed successfully");
         } catch (Exception e) {
             log.error("Error in scheduled reminder check", e);

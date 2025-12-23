@@ -25,6 +25,8 @@ public class NotificationService {
     private final SmsService smsService;
     private final TemplateService templateService;
     private final WebSocketNotificationService webSocketNotificationService;
+    private final EventAttendeeRepository eventAttendeeRepository;
+    private final UserDirectoryClient userDirectoryClient;
 
     @Value("${notification.email.retry-attempts:3}")
     private int maxRetryAttempts;
@@ -35,8 +37,29 @@ public class NotificationService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     @Transactional
+    public void handleEventAttendanceAcceptedEvent(EventAttendanceAcceptedEvent event) {
+        log.info("Handling event attendance accepted: event {} by user {} at {}", event.getEventId(), event.getUserId(), event.getEventStartAt());
+
+        // Idempotentnost (eventId, userId)
+        var existing = eventAttendeeRepository.findByEventIdAndUserId(event.getEventId(), event.getUserId());
+        if (existing.isPresent()) {
+            log.info("EventAttendee already exists for event {} and user {} — skipping insert", event.getEventId(), event.getUserId());
+            return;
+        }
+
+        EventAttendee attendee = new EventAttendee();
+        attendee.setEventId(event.getEventId());
+        attendee.setEventTitle(event.getEventTitle());
+        attendee.setEventStartAt(event.getEventStartAt());
+        attendee.setUserId(event.getUserId());
+
+        eventAttendeeRepository.save(attendee);
+        log.info("Stored attendee for event {} and user {}", event.getEventId(), event.getUserId());
+    }
+
+    @Transactional
     public void handleJoinRequestSentEvent(JoinRequestsSentEvent event) {
-        log.info("Handling join request {} from user {} to organization {}", 
+        log.info("Handling join request {} from user {} to organization {}",
                 event.getJoinRequestId(), event.getRequesterUserId(), event.getOrganizationId());
         sendJoinRequestSentNotification(event);
     }
@@ -58,7 +81,7 @@ public class NotificationService {
 
     @Transactional
     public void handleInvitationSentEvent(InvitationSentEvent event) {
-        log.info("Handling invitation {} for user {} from organization {}", 
+        log.info("Handling invitation {} for user {} from organization {}",
                 event.getInvitationId(), event.getInvitedUserId(), event.getOrganizationId());
 
         sendInvitationNotification(event);
@@ -109,20 +132,20 @@ public class NotificationService {
 
         log.info("Sent NEW_REQUEST notification to admins of organization {}", event.getOrganizationId());
     }
-    
+
     private void sendJoinRequestApprovedNotification(JoinRequestRespondedEvent event) {
         Optional<NotificationTemplate> templateOpt = templateRepository.findByTemplateKey("REQUEST_ACCEPTED");
         if (templateOpt.isEmpty()) {
             log.error("REQUEST_ACCEPTED template not found");
             return;
         }
-        
+
         NotificationTemplate template = templateOpt.get();
-        
+
         Map<String, Object> variables = new HashMap<>();
         variables.put("userName", event.getRequesterFirstName() + " " + event.getRequesterLastName());
         variables.put("orgName", event.getOrganizationName());
-        
+
         // Pošljemo obvestilo uporabniku
         sendNotification(
                 null,
@@ -136,20 +159,20 @@ public class NotificationService {
                 "join_request"
         );
     }
-    
+
     private void sendJoinRequestRejectedNotification(JoinRequestRespondedEvent event) {
         Optional<NotificationTemplate> templateOpt = templateRepository.findByTemplateKey("REQUEST_DECLINED");
         if (templateOpt.isEmpty()) {
             log.error("REQUEST_DECLINED template not found");
             return;
         }
-        
+
         NotificationTemplate template = templateOpt.get();
-        
+
         Map<String, Object> variables = new HashMap<>();
         variables.put("userName", event.getRequesterFirstName() + " " + event.getRequesterLastName());
         variables.put("orgName", event.getOrganizationName());
-        
+
         // Pošljemo obvestilo uporabniku
         sendNotification(
                 null,
@@ -163,21 +186,21 @@ public class NotificationService {
                 "join_request"
         );
     }
-    
+
     private void sendInvitationNotification(InvitationSentEvent event) {
         Optional<NotificationTemplate> templateOpt = templateRepository.findByTemplateKey("NEW_INVITATION");
         if (templateOpt.isEmpty()) {
             log.error("NEW_INVITATION template not found");
             return;
         }
-        
+
         NotificationTemplate template = templateOpt.get();
-        
+
         Map<String, Object> variables = new HashMap<>();
         variables.put("recipientName", event.getInvitedFirstName() + " " + event.getInvitedLastName());
         variables.put("orgName", event.getOrganizationName());
         variables.put("invitatioAcceptLink", "/organizations/my");
-        
+
         // Pošljemo obvestilo povabljenemu uporabniku
         sendNotification(
                 null,
@@ -191,7 +214,7 @@ public class NotificationService {
                 "invitation"
         );
     }
-    
+
     private void sendInvitationAcceptedNotification(InvitationRespondedEvent event) {
         Optional<NotificationTemplate> templateOpt = templateRepository.findByTemplateKey("INVITATION_ACCEPTED");
         if (templateOpt.isEmpty()) {
@@ -224,7 +247,7 @@ public class NotificationService {
 
         log.info("Sent INVITATION_ACCEPTED notification to admins of organization {}", event.getOrganizationId());
     }
-    
+
     private void sendInvitationDeclinedNotification(InvitationRespondedEvent event) {
         Optional<NotificationTemplate> templateOpt = templateRepository.findByTemplateKey("INVITATION_DECLINED");
         if (templateOpt.isEmpty()) {
@@ -253,7 +276,7 @@ public class NotificationService {
                     event.getInvitationId(),
                     "invitation");
         }
-        
+
         log.info("Sent INVITATION_DECLINED notification to admins of organization {}", event.getOrganizationId());
     }
 
@@ -281,15 +304,15 @@ public class NotificationService {
         try {
             String subject = templateService.renderTemplate(template.getSubject(), variables);
             String body = templateService.renderTemplate(template.getBodyTemplate(), variables);
-            
+
             log.setSubject(subject);
             log.setBody(body);
 
             // Pošljemo obvestilo v aplikaciji z uporabo WebSocket (za APP, EMAIL_APP, ali ALL tip)
-            if (userId != null && 
-                    (template.getType() == NotificationType.APP || 
-                     template.getType() == NotificationType.EMAIL_APP || 
-                     template.getType() == NotificationType.ALL)) {
+            if (userId != null &&
+                    (template.getType() == NotificationType.APP ||
+                            template.getType() == NotificationType.EMAIL_APP ||
+                            template.getType() == NotificationType.ALL)) {
                 try {
                     webSocketNotificationService.sendInAppNotification(
                             userId,
@@ -307,9 +330,9 @@ public class NotificationService {
             }
 
             // Pošlji email (za EMAIL, EMAIL_APP, ali ALL tip)
-            if ((template.getType() == NotificationType.EMAIL || 
-                 template.getType() == NotificationType.EMAIL_APP || 
-                 template.getType() == NotificationType.ALL) && email != null) { // email uporabnika imamo le če je ta privolil k uporabi
+            if ((template.getType() == NotificationType.EMAIL ||
+                    template.getType() == NotificationType.EMAIL_APP ||
+                    template.getType() == NotificationType.ALL) && email != null) { // email uporabnika imamo le če je ta privolil k uporabi
                 try {
                     String externalId = emailService.sendEmail(email, subject, body);
                     log.setExternalId(externalId);
@@ -354,75 +377,41 @@ public class NotificationService {
         logRepository.save(log);
     }
 
-    // TODO implementiraj ustvarjanje opomnikov ob dodajanju gosta na dogodek
-//    private void createScheduledReminder(GuestAddedEvent event) {
-//        LocalDateTime reminderTime = event.getEventStartTime().minusHours(reminderAdvanceHours);
-//
-//        if (reminderTime.isBefore(LocalDateTime.now())) {
-//            log.info("Event {} is too soon for reminder, skipping", event.getEventId());
-//            return;
-//        }
-//
-//        ScheduledReminder reminder = new ScheduledReminder();
-//        reminder.setEventId(event.getEventId());
-//        reminder.setEventName(event.getEventName());
-//        reminder.setEventStartTime(event.getEventStartTime());
-//        reminder.setRecipientEmail(event.getGuestEmail());
-//        reminder.setRecipientPhone(event.getGuestPhone());
-//        reminder.setRecipientName(event.getGuestName());
-//        reminder.setReminderTime(reminderTime);
-//        reminder.setHoursBeforeEvent(reminderAdvanceHours);
-//        reminder.setType(NotificationType.ALL);
-//        reminder.setIsSent(false);
-//
-//        reminderRepository.save(reminder);
-//        log.info("Created scheduled reminder for event {} at {}", event.getEventId(), reminderTime);
-//    }
+    @Transactional
+    public void sendScheduledReminders() {
+        // Izračunamo okno, ki predstavlja jutri po UTC [00:00, 24:00)
+        var now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        var tomorrowStart = now.plusDays(1).toLocalDate().atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
+        var tomorrowEnd = tomorrowStart.plusDays(1);
 
-//    @Transactional
-//    public void sendScheduledReminders() {
-//        LocalDateTime now = LocalDateTime.now();
-//        var dueReminders = reminderRepository.findDueReminders(now);
-//
-//        log.info("Found {} due reminders to send", dueReminders.size());
-//
-//        for (ScheduledReminder reminder : dueReminders) {
-//            try {
-//                sendReminder(reminder);
-//                reminder.setIsSent(true);
-//                reminder.setSentAt(LocalDateTime.now());
-//                reminderRepository.save(reminder);
-//            } catch (Exception e) {
-//                log.error("Failed to send reminder {}", reminder.getId(), e);
-//            }
-//        }
-//    }
+        var attendees = eventAttendeeRepository.findAllBetween(tomorrowStart, tomorrowEnd);
+        log.info("Found {} attendees with events tomorrow ({} to {})", attendees.size(), tomorrowStart, tomorrowEnd);
 
-//    private void sendReminder(ScheduledReminder reminder) {
-//        Optional<NotificationTemplate> templateOpt = templateRepository
-//                .findByTemplateKeyAndIsActiveTrue("EVENT_REMINDER");
-//
-//        if (templateOpt.isEmpty()) {
-//            log.error("EVENT_REMINDER template not found");
-//            return;
-//        }
-//
-//        NotificationTemplate template = templateOpt.get();
-//
-//        Map<String, Object> variables = new HashMap<>();
-//        variables.put("recipientName", reminder.getRecipientName());
-//        variables.put("eventName", reminder.getEventName());
-//        variables.put("eventDate", reminder.getEventStartTime().format(DATE_FORMATTER));
-//        variables.put("eventLocation", ""); // Location not stored in reminder
-//
-//        sendNotification(
-//                reminder.getEventId(),
-//                null,
-//                reminder.getRecipientEmail(),
-//                reminder.getRecipientPhone(),
-//                template,
-//                variables);
-//
-//        log.info("Sent reminder for event {} to {}", reminder.getEventId(), reminder.getRecipientEmail());
-//    }
+        for (EventAttendee attendee : attendees) {
+            try {
+                String phone = userDirectoryClient.getUserPhone(attendee.getUserId());
+                if (phone == null || phone.isBlank()) {
+                    log.info("No phone for user {}, skipping SMS reminder for event {}", attendee.getUserId(), attendee.getEventId());
+                    continue;
+                }
+
+                String when = attendee.getEventStartAt().atZoneSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime().format(DATE_FORMATTER);
+                String body = String.format("Reminder: '%s' is tomorrow at %s.", attendee.getEventTitle(), when);
+
+                smsService.sendSms(phone, body, 160);
+
+                // Logirsmo kot SENT (tip SMS), ne shranjujemo telefonske številke v bazo
+                NotificationTemplate pseudoTemplate = new NotificationTemplate();
+                pseudoTemplate.setType(NotificationType.SMS);
+                pseudoTemplate.setTemplateKey("EVENT_REMINDER_SMS");
+                pseudoTemplate.setSubject("Event Reminder");
+                pseudoTemplate.setBodyTemplate(body);
+
+                sendNotification(attendee.getEventId(), attendee.getUserId(), null, null, // do not store phone
+                        pseudoTemplate, Collections.emptyMap(), "event_reminder", attendee.getEventId(), "event");
+            } catch (Exception ex) {
+                log.error("Failed to send reminder for event {} to user {}", attendee.getEventId(), attendee.getUserId(), ex);
+            }
+        }
+    }
 }

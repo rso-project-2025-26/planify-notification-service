@@ -46,7 +46,7 @@ public class ReminderSchedulerHandler implements RequestHandler<ScheduledEvent, 
 
         try {
             // Process scheduled reminders
-//            notificationService.sendScheduledReminders(); TODO implementiraj opomnike
+            notificationService.sendScheduledReminders();
 
             response.put("statusCode", 200);
             response.put("message", "Scheduled reminders processed successfully");

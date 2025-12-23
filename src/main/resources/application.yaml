@@ -89,6 +89,12 @@ kafka:
         join-request-responded: ${KAFKA_TOPIC_JOIN_REQUESTS:user.join-request-responded}
         invitation-sent: ${KAFKA_TOPIC_INVITATIONS:user.invitation-sent}
         invitation-responded: ${KAFKA_TOPIC_INVITATIONS:user.invitation-responded}
+        event-attendance-accepted: ${KAFKA_TOPIC_EVENT_ATTENDANCE_ACCEPTED:event.attendance-accepted}
+
+# External services
+user-service:
+    base-url: ${USER_SERVICE_BASE_URL:http://localhost:8081}
+    user-endpoint: ${USER_SERVICE_USER_ENDPOINT:/api/users/{id}}
 
 management:
     endpoints:
