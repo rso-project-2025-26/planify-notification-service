@@ -36,6 +36,7 @@ public class NotificationController {
 
     private final NotificationTemplateRepository templateRepository;
     private final NotificationLogRepository logRepository;
+    private final NotificationService notificationService;
 
     /**
      * Pridobi seznam vseh templatov za obvestila.
@@ -142,17 +143,4 @@ public class NotificationController {
     public ResponseEntity<List<NotificationLog>> getLogsByUser(@PathVariable UUID userId) {
         return ResponseEntity.ok(logRepository.findByUserId(userId));
     }
-
-    // TODO implementiraj opomnike
-//    @PostMapping("/reminders/check")
-//    public ResponseEntity<String> checkReminders() {
-//        try {
-//            notificationService.sendScheduledReminders();
-//            return ResponseEntity.ok("Reminder check completed");
-//        } catch (Exception e) {
-//            log.error("Error checking reminders", e);
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-//                    .body("Error: " + e.getMessage());
-//        }
-//    }
 }

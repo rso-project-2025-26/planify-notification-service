@@ -54,3 +54,6 @@ failsafe-reports/
 # Misc
 *.swp
 *.swo
+
+local.settings.json
+target/azure-functions/

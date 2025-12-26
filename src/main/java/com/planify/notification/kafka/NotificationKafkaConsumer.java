@@ -83,7 +83,7 @@ public class NotificationKafkaConsumer {
             topics = "${kafka.topics.event-attendance-accepted}",
             groupId = "${spring.kafka.consumer.group-id}",
             errorHandler = "kafkaListenerErrorHandler",
-            containerFactory = "invitationsRespondedKafkaListenerContainerFactory"
+            containerFactory = "eventAttendanceAcceptedKafkaListenerContainerFactory"
     )
     public void handleEventAttendanceAccepted(EventAttendanceAcceptedEvent event) {
         log.info("User {} accepted attendance for event {} starting at {}", event.getUserId(), event.getEventId(), event.getEventStartAt());

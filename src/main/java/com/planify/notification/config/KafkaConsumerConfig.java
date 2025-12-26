@@ -1,9 +1,6 @@
 package com.planify.notification.config;
 
-import com.planify.notification.event.InvitationRespondedEvent;
-import com.planify.notification.event.InvitationSentEvent;
-import com.planify.notification.event.JoinRequestRespondedEvent;
-import com.planify.notification.event.JoinRequestsSentEvent;
+import com.planify.notification.event.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.context.annotation.Bean;
@@ -103,6 +100,28 @@ public class KafkaConsumerConfig {
                 new StringDeserializer(), valueDeserializer);
 
         ConcurrentKafkaListenerContainerFactory<String, InvitationRespondedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(cf);
+        return factory;
+    }
+
+    /**
+     * ContainerFactory za event-attendance-accepted topic, deserializira vrednosti v objekt tipa EventAttendanceAcceptedEvent.
+     */
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, EventAttendanceAcceptedEvent> eventAttendanceAcceptedKafkaListenerContainerFactory(
+            ConsumerFactory<Object, Object> defaultConsumerFactory) {
+        Map<String, Object> props = new HashMap<>(((DefaultKafkaConsumerFactory<?, ?>) defaultConsumerFactory).getConfigurationProperties());
+        stripJsonDeserializerProps(props);
+
+        JsonDeserializer<EventAttendanceAcceptedEvent> valueDeserializer = new JsonDeserializer<>(EventAttendanceAcceptedEvent.class);
+        valueDeserializer.addTrustedPackages("*");
+        valueDeserializer.setUseTypeMapperForKey(false);
+        valueDeserializer.setUseTypeHeaders(false);
+
+        DefaultKafkaConsumerFactory<String, EventAttendanceAcceptedEvent> cf = new DefaultKafkaConsumerFactory<>(props,
+                new StringDeserializer(), valueDeserializer);
+
+        ConcurrentKafkaListenerContainerFactory<String, EventAttendanceAcceptedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(cf);
         return factory;
     }

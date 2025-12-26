@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         // WebSocket handshake
                         .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers("/api/notifications/**").permitAll()
                         // Vsi ostali endpointi
                         .anyRequest().authenticated()
                 )
