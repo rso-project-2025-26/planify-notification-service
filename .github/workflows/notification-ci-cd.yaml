@@ -2,7 +2,7 @@ name: Notification Service - CI/CD
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, bug-fixes]
 
 env:
   REGISTRY: ghcr.io
@@ -45,7 +45,7 @@ jobs:
     name: Build Docker Image
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/bug-fixes')
     permissions:
       contents: read
       packages: write
