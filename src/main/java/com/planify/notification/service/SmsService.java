@@ -1,9 +1,9 @@
 package com.planify.notification.service;
 
-import com.twilio.Twilio;
-import com.twilio.rest.api.v2010.account.Message;
-import com.twilio.type.PhoneNumber;
+import com.vonage.client.VonageClient;
+import com.vonage.client.sms.messages.TextMessage;
 import lombok.extern.slf4j.Slf4j;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -12,37 +12,35 @@ import jakarta.annotation.PostConstruct;
 
 @Service
 @Slf4j
-@ConditionalOnProperty(prefix = "notification.sms", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class SmsService {
 
-    private final String accountSid;
-    private final String authToken;
-    private final String fromPhoneNumber;
+    @Value("${vonage.api-key}")
+    private String apiKey;
 
-    public SmsService(
-            @Value("${twilio.account-sid}") String accountSid,
-            @Value("${twilio.auth-token}") String authToken,
-            @Value("${twilio.phone-number}") String fromPhoneNumber) {
-        this.accountSid = accountSid;
-        this.authToken = authToken;
-        this.fromPhoneNumber = fromPhoneNumber;
-    }
+    @Value("${vonage.api-secret}")
+    private String apiSecret;
+
+    @Value("${vonage.phone-number}")
+    private String fromPhoneNumber;
+
+    private VonageClient client;
 
     @PostConstruct
     public void init() {
-        Twilio.init(accountSid, authToken);
-        log.info("Twilio SMS service initialized");
+        client = VonageClient.builder()
+                .apiKey(apiKey)
+                .apiSecret(apiSecret)
+                .build();
+        log.info("Vonage SMS service initialized");
     }
 
+    @Retry(name = "smsService")
     public String sendSms(String toPhoneNumber, String messageBody) {
         try {
-            Message message = Message.creator(
-                    new PhoneNumber(toPhoneNumber),
-                    new PhoneNumber(fromPhoneNumber),
-                    messageBody).create();
-
-            log.info("SMS sent successfully to {} with SID: {}", toPhoneNumber, message.getSid());
-            return message.getSid();
+            TextMessage message = new TextMessage(fromPhoneNumber, toPhoneNumber, messageBody);
+            client.getSmsClient().submitMessage(message);
+            log.info("SMS sent successfully to {} with SID: {}", toPhoneNumber, message.getEntityId());
+            return message.getEntityId();
         } catch (Exception e) {
             log.error("Failed to send SMS to {}: {}", toPhoneNumber, e.getMessage(), e);
             throw new RuntimeException("Failed to send SMS", e);

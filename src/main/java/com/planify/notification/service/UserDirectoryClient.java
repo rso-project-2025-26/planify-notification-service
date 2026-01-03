@@ -16,24 +16,20 @@ import java.util.UUID;
 @Slf4j
 public class UserDirectoryClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
-    @Value("${user-service.base-url:http://localhost:8081}")
+    @Value("${user-service.base-url:http://localhost:8082}")
     private String baseUrl;
 
     @Value("${user-service.user-endpoint:/api/users/{id}}")
     private String userEndpoint;
 
-    public String getUserPhone(UUID userId) {
+    public UserResponse getUser(UUID userId) {
         String url = baseUrl + userEndpoint.replace("{id}", userId.toString());
         try {
             ResponseEntity<UserResponse> response = restTemplate.getForEntity(url, UserResponse.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                if (response.getBody().getSmsConsent()) {
-                    return response.getBody().getPhoneNumber();
-                } else {
-                    return null;
-                }
+                return response.getBody();
             }
             log.warn("User service returned non-OK for {}: {}", userId, response.getStatusCode());
         } catch (RestClientException ex) {

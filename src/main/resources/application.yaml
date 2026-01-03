@@ -57,16 +57,10 @@ sendgrid:
     from-name: Planify Events
 
 # Twilio Configuration
-twilio:
-    account-sid: ${TWILIO_ACCOUNT_SID:your-twilio-account-sid}
-    auth-token: ${TWILIO_AUTH_TOKEN:your-twilio-auth-token}
-    phone-number: ${TWILIO_PHONE_NUMBER:+1234567890}
-
-# AWS Configuration
-aws:
-    region: ${AWS_REGION:eu-central-1}
-    lambda:
-        function-name: planify-reminder-scheduler
+vonage:
+    api-key: ${VONAGE_API_KEY:84aad65c}
+    api-secret: ${VONAGE_API_SECRET:TD7VpEK0MDAFWRBk}
+    phone-number: ${VONAGE_PHONE_NUMBER:+38630310696}
 
 # Notification Settings
 notification:
@@ -89,11 +83,11 @@ kafka:
         join-request-responded: ${KAFKA_TOPIC_JOIN_REQUESTS:user.join-request-responded}
         invitation-sent: ${KAFKA_TOPIC_INVITATIONS:user.invitation-sent}
         invitation-responded: ${KAFKA_TOPIC_INVITATIONS:user.invitation-responded}
-        event-attendance-accepted: ${KAFKA_TOPIC_EVENT_ATTENDANCE_ACCEPTED:event.attendance-accepted}
+        event-attendance-accepted: ${KAFKA_TOPIC_EVENT_ATTENDANCE_ACCEPTED:event-attendance-accepted}
 
 # External services
 user-service:
-    base-url: ${USER_SERVICE_BASE_URL:http://localhost:8081}
+    base-url: ${USER_SERVICE_BASE_URL:http://localhost:8082}
     user-endpoint: ${USER_SERVICE_USER_ENDPOINT:/api/users/{id}}
 
 management:
@@ -104,3 +98,24 @@ management:
     endpoint:
         health:
             show-details: always
+
+# Resilience4j retry configuration
+resilience4j:
+    retry:
+        instances:
+            smsService:
+                maxAttempts: 3
+                waitDuration: 1s
+                enableExponentialBackoff: true
+                exponentialBackoffMultiplier: 2
+                retryExceptions:
+                    - java.io.IOException
+                    - java.lang.RuntimeException
+            emailService:
+                maxAttempts: 3
+                waitDuration: 1s
+                enableExponentialBackoff: true
+                exponentialBackoffMultiplier: 2
+                retryExceptions:
+                    - java.io.IOException
+                    - java.lang.RuntimeException

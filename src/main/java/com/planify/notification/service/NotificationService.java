@@ -9,7 +9,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigInteger;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -20,12 +23,11 @@ public class NotificationService {
 
     private final NotificationTemplateRepository templateRepository;
     private final NotificationLogRepository logRepository;
-    private final ScheduledReminderRepository reminderRepository;
     private final EmailService emailService;
     private final SmsService smsService;
     private final TemplateService templateService;
     private final WebSocketNotificationService webSocketNotificationService;
-    private final EventAttendeeRepository eventAttendeeRepository;
+    private final EventAttendeeReminderRepository eventAttendeeReminderRepository;
     private final UserDirectoryClient userDirectoryClient;
 
     @Value("${notification.email.retry-attempts:3}")
@@ -41,19 +43,19 @@ public class NotificationService {
         log.info("Handling event attendance accepted: event {} by user {} at {}", event.getEventId(), event.getUserId(), event.getEventStartAt());
 
         // Idempotentnost (eventId, userId)
-        var existing = eventAttendeeRepository.findByEventIdAndUserId(event.getEventId(), event.getUserId());
+        var existing = eventAttendeeReminderRepository.findByEventIdAndUserId(event.getEventId(), event.getUserId());
         if (existing.isPresent()) {
             log.info("EventAttendee already exists for event {} and user {} — skipping insert", event.getEventId(), event.getUserId());
             return;
         }
 
-        EventAttendee attendee = new EventAttendee();
+        EventAttendeeReminder attendee = new EventAttendeeReminder();
         attendee.setEventId(event.getEventId());
         attendee.setEventTitle(event.getEventTitle());
         attendee.setEventStartAt(event.getEventStartAt());
         attendee.setUserId(event.getUserId());
 
-        eventAttendeeRepository.save(attendee);
+        eventAttendeeReminderRepository.save(attendee);
         log.info("Stored attendee for event {} and user {}", event.getEventId(), event.getUserId());
     }
 
@@ -378,40 +380,93 @@ public class NotificationService {
     }
 
     @Transactional
-    public void sendScheduledReminders() {
+    public int sendScheduledReminders() {
         // Izračunamo okno, ki predstavlja jutri po UTC [00:00, 24:00)
         var now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
         var tomorrowStart = now.plusDays(1).toLocalDate().atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
         var tomorrowEnd = tomorrowStart.plusDays(1);
 
-        var attendees = eventAttendeeRepository.findAllBetween(tomorrowStart, tomorrowEnd);
+        var attendees = eventAttendeeReminderRepository.findAllBetween(tomorrowStart, tomorrowEnd);
         log.info("Found {} attendees with events tomorrow ({} to {})", attendees.size(), tomorrowStart, tomorrowEnd);
 
-        for (EventAttendee attendee : attendees) {
+        int remindersSent = 0;
+        for (EventAttendeeReminder attendee : attendees) {
+            NotificationLog notificationLog = new NotificationLog();
+            notificationLog.setEventId(attendee.getEventId());
+            notificationLog.setUserId(attendee.getUserId());
+            notificationLog.setType(NotificationType.SMS);
+            notificationLog.setTemplateKey("EVENT_REMINDER_SMS");
+            notificationLog.setSubject("Event Reminder");
+
+            UserDirectoryClient.UserResponse user = userDirectoryClient.getUser(attendee.getUserId());
+            if (user == null) {
+                log.error("User {} not found", attendee.getUserId());
+                continue;
+            }
             try {
-                String phone = userDirectoryClient.getUserPhone(attendee.getUserId());
+                if (attendee.getIsSent()) {
+                    log.info("Event {} reminder already sent to user {}", attendee.getEventId(), attendee.getUserId());
+                    continue;
+                }
+                Boolean smsConsent = user.getSmsConsent();
+                if (smsConsent == null || !smsConsent) {
+                    log.info("User {} has not given SMS consent, skipping SMS reminder for event {}", attendee.getUserId(), attendee.getEventId());
+                    continue;
+                }
+                String phone = user.getPhoneNumber();
                 if (phone == null || phone.isBlank()) {
                     log.info("No phone for user {}, skipping SMS reminder for event {}", attendee.getUserId(), attendee.getEventId());
                     continue;
                 }
 
                 String when = attendee.getEventStartAt().atZoneSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime().format(DATE_FORMATTER);
-                String body = String.format("Reminder: '%s' is tomorrow at %s.", attendee.getEventTitle(), when);
+                String body = String.format("You have an event coming tomorrow! Event: %s Start time: %s", attendee.getEventTitle(), when);
+                notificationLog.setBody(body);
 
-                smsService.sendSms(phone, body, 160);
+                String smsSid = smsService.sendSms(phone, body, 160);
 
-                // Logirsmo kot SENT (tip SMS), ne shranjujemo telefonske številke v bazo
-                NotificationTemplate pseudoTemplate = new NotificationTemplate();
-                pseudoTemplate.setType(NotificationType.SMS);
-                pseudoTemplate.setTemplateKey("EVENT_REMINDER_SMS");
-                pseudoTemplate.setSubject("Event Reminder");
-                pseudoTemplate.setBodyTemplate(body);
+                notificationLog.setStatus(NotificationStatus.SENT);
+                notificationLog.setSentAt(LocalDateTime.now());
+                notificationLog.setExternalId(smsSid);
+                logRepository.save(notificationLog);
 
-                sendNotification(attendee.getEventId(), attendee.getUserId(), null, null, // do not store phone
-                        pseudoTemplate, Collections.emptyMap(), "event_reminder", attendee.getEventId(), "event");
+                attendee.setIsSent(true);
+                attendee.setSentAt(OffsetDateTime.now(ZoneOffset.UTC));
+                eventAttendeeReminderRepository.save(attendee);
+                remindersSent++;
             } catch (Exception ex) {
+                notificationLog.setStatus(NotificationStatus.FAILED);
+                notificationLog.setErrorMessage(ex.getMessage());
+                logRepository.save(notificationLog);
                 log.error("Failed to send reminder for event {} to user {}", attendee.getEventId(), attendee.getUserId(), ex);
+
+                log.info("Trying to send email and in-app notification for user {}", attendee.getUserId());
+                Boolean emailConsent = user.getEmailConsent();
+                if (emailConsent == null || !emailConsent) {
+                    log.info("User {} has not given email consent, skipping email reminder for event {}", attendee.getUserId(), attendee.getEventId());
+                    continue;
+                }
+                String email = user.getEmail();
+                if (email == null || email.isBlank()) {
+                    log.info("No email for user {}, skipping email reminder for event {}", attendee.getUserId(), attendee.getEventId());
+                    continue;
+                }
+
+                Optional<NotificationTemplate> templateOpt = templateRepository.findByTemplateKey("SMS_REMINDER_FALLBACK");
+                if (templateOpt.isEmpty()) {
+                    log.error("SMS_REMINDER_FALLBACK template not found");
+                    continue;
+                }
+
+                NotificationTemplate template = templateOpt.get();
+
+                Map<String, Object> variables = new HashMap<>();
+                variables.put("event_title", attendee.getEventTitle());
+                variables.put("event_start_at", attendee.getEventStartAt().format(DATE_FORMATTER));
+
+                sendNotification(attendee.getEventId(), attendee.getUserId(), email, null, template, variables, "sms_reminder_fallback", attendee.getEventId(), "event");
             }
         }
+        return remindersSent;
     }
 }

@@ -8,6 +8,7 @@ import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
 import lombok.extern.slf4j.Slf4j;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class EmailService {
         this.fromName = fromName;
     }
 
+    @Retry(name = "emailService")
     public String sendEmail(String toEmail, String subject, String htmlBody) throws IOException {
         Email from = new Email(fromEmail, fromName);
         Email to = new Email(toEmail);

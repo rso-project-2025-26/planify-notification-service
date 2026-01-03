@@ -23,6 +23,19 @@
         <spring-cloud.version>2024.0.0</spring-cloud.version>
     </properties>
     
+    <dependencyManagement>
+        <dependencies>
+            <!-- Manage Resilience4j versions -->
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-bom</artifactId>
+                <version>2.2.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    
     <dependencies>
         <!-- Spring Boot Starters -->
         <dependency>
@@ -85,24 +98,18 @@
             <version>4.10.2</version>
         </dependency>
         
-        <!-- Twilio for SMS -->
+        <!-- VONAGE for SMS -->
         <dependency>
-            <groupId>com.twilio.sdk</groupId>
-            <artifactId>twilio</artifactId>
-            <version>10.6.3</version>
+            <groupId>com.vonage</groupId>
+            <artifactId>client</artifactId>
+            <version>7.7.0</version>
         </dependency>
         
-        <!-- AWS Lambda -->
+        <!-- Azure Functions Java Library -->
         <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-lambda-java-core</artifactId>
-            <version>1.2.3</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-lambda-java-events</artifactId>
-            <version>3.14.0</version>
+            <groupId>com.microsoft.azure.functions</groupId>
+            <artifactId>azure-functions-java-library</artifactId>
+            <version>3.2.2</version>
         </dependency>
         
         <!-- Template Engine (Thymeleaf for email templates) -->
@@ -154,24 +161,21 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.6.0</version>
         </dependency>
+
+        <!-- Resilience4j for retries/circuit breakers -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+        </dependency>
+        <!-- Enable Spring AOP proxies required for resilience4j annotations -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
     </dependencies>
     
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>com.planify.notification.NotificationServiceApplication</mainClass>
-                    <excludes>
-                        <exclude>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
-            </plugin>
-            
             <plugin>
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-maven-plugin</artifactId>
@@ -184,6 +188,31 @@
                     <schemas>
                         <schema>notification</schema>
                     </schemas>
+                </configuration>
+            </plugin>
+            <!-- Azure Functions Plugin -->
+            <plugin>
+                <groupId>com.microsoft.azure</groupId>
+                <artifactId>azure-functions-maven-plugin</artifactId>
+                <version>1.40.0</version>
+                <configuration>
+                    <appName>planify-notification-reminder</appName>
+                    <resourceGroup>planify-rg</resourceGroup>
+                    <region>switzerlandnorth</region>
+                    <runtime>
+                        <os>linux</os>
+                        <javaVersion>21</javaVersion>
+                    </runtime>
+                    <appSettings>
+                        <property>
+                            <name>FUNCTIONS_EXTENSION_VERSION</name>
+                            <value>~4</value>
+                        </property>
+                        <property>
+                            <name>FUNCTIONS_WORKER_RUNTIME</name>
+                            <value>java</value>
+                        </property>
+                    </appSettings>
                 </configuration>
             </plugin>
         </plugins>
