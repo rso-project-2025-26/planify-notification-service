@@ -3,6 +3,11 @@ name: Notification Service - CI/CD
 on:
   push:
     branches: [main, dev]
+    paths:
+      - 'notification-core/**'
+      - 'pom.xml'
+      - 'Dockerfile'
+      - '. github/workflows/notification-ci-cd.yaml'
 
 env:
   REGISTRY: ghcr.io
@@ -36,11 +41,13 @@ jobs:
           java-version: "21"
           distribution: "temurin"
           cache: maven
-      - name: Build multi-module project
+      # Build only notification-core (not functions)
+      - name: Build notification-core
         run: |
           chmod +x mvnw
-          ./mvnw clean install -DskipTests
-      - name: Run tests (notification-core only)
+          ./mvnw clean install -DskipTests -pl notification-core -am
+
+      - name: Run tests
         run: ./mvnw test -pl notification-core
 
   build-docker:
