@@ -1,16 +1,28 @@
-.PHONY: build run test clean docker-build docker-run
+.PHONY: build run test clean docker-build docker-run build-core build-functions
 
-# Build the application
+# Build all modules
 build:
 	./mvnw clean package -DskipTests
+
+# Build only Spring Boot core
+build-core:
+	./mvnw clean package -DskipTests -pl notification-core -am
+
+# Build only Azure Functions
+build-functions:
+	./mvnw clean package -DskipTests -pl notification-functions -am
 
 # Build with tests
 build-test:
 	./mvnw clean package
 
-# Run the application locally
+# Run the Spring Boot application locally
 run:
-	./mvnw spring-boot:run
+	cd notification-core && ../mvnw spring-boot:run
+
+# Run Azure Functions locally
+run-functions:
+	cd notification-functions && mvn azure-functions:run
 
 # Run tests
 test:
@@ -20,7 +32,7 @@ test:
 clean:
 	./mvnw clean
 
-# Build Docker image
+# Build Docker image (Spring Boot only)
 docker-build:
 	docker build -t planify/notification-service:latest .
 
@@ -32,7 +44,6 @@ docker-run:
 		-e SENDGRID_API_KEY=$$SENDGRID_API_KEY \
 		planify/notification-service:latest
 
-# Build Lambda deployment package
-lambda-build:
-	./mvnw clean package
-	cp target/notification-service-1.0.0-SNAPSHOT-lambda.jar lambda-deployment.jar
+# Deploy Azure Functions
+deploy-functions:
+	cd notification-functions && mvn azure-functions:deploy

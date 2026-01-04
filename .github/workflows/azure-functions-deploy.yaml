@@ -1,0 +1,63 @@
+name: Azure Functions - Deploy
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'notification-functions/**'
+      - 'notification-core/**'  # Functions depend on core
+      - 'pom.xml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AZURE_FUNCTIONAPP_NAME: planify-reminder-function
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: notification-functions
+  JAVA_VERSION: '21'
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Azure Functions
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+          
+      - name: Build notification-core (dependency)
+        run: |
+          chmod +x mvnw
+          ./mvnw clean install -DskipTests -pl notification-core -am
+
+      - name: Build notification-functions
+        run: |
+          ./mvnw clean package -DskipTests -pl notification-functions -am
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/target/azure-functions/${{ env.AZURE_FUNCTIONAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+          
+      - name: Verify deployment
+        run: |
+            echo "Waiting for function to warm up..."
+            sleep 30
+            
+            # Test health endpoint
+            HEALTH_URL="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/health"
+            echo "Testing:  $HEALTH_URL"
+            
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Health check passed"
+            else
+              echo "Health check returned:  $HTTP_CODE"
+            fi

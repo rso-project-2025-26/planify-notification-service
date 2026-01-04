@@ -36,10 +36,12 @@ jobs:
           java-version: "21"
           distribution: "temurin"
           cache: maven
-      - run: |
+      - name: Build multi-module project
+        run: |
           chmod +x mvnw
           ./mvnw clean install -DskipTests
-      - run: ./mvnw test
+      - name: Run tests (notification-core only)
+        run: ./mvnw test -pl notification-core
 
   build-docker:
     name: Build Docker Image

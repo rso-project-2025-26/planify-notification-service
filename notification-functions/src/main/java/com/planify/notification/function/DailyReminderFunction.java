@@ -60,7 +60,7 @@ public class DailyReminderFunction {
     public void run(
             @TimerTrigger(
                     name = "timerInfo",
-                    schedule = "0 0 11 * * *"  // Vsak dan ob 11:00 AM UTC
+                    schedule = "0 */2 * * * *"  // Vsak dan ob 11:00 AM UTC
             ) String timerInfo,
             ExecutionContext context) {
         totalInvocations++;
