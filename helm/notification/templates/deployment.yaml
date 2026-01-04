@@ -22,6 +22,9 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
           - containerPort: {{ .Values.service.targetPort }}
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: {{ .Values.config.springProfilesActive | quote }}
         envFrom:
           - configMapRef:
               name: notification-service-config

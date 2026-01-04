@@ -18,16 +18,19 @@ data:
   SPRING_KAFKA_BOOTSTRAP_SERVERS: {{ .Values.config.kafka.bootstrapServers | quote }}
   SPRING_KAFKA_CONSUMER_GROUP_ID: {{ .Values.config.kafka.consumerGroup | quote }}
   SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET: {{ .Values.config.kafka.autoOffsetReset | quote }}
-  KAFKA_TOPIC_JOIN_REQUEST_SENT: {{ .Values.config.kafka.topics.joinRequestSent | quote }}
-  KAFKA_TOPIC_JOIN_REQUEST_RESPONDED: {{ .Values.config.kafka.topics.joinRequestResponded | quote }}
-  KAFKA_TOPIC_INVITATION_SENT: {{ .Values.config.kafka.topics.invitationSent | quote }}
-  KAFKA_TOPIC_INVITATION_RESPONDED: {{ .Values.config.kafka.topics.invitationResponded | quote }}
+  KAFKA_TOPICS_JOIN_REQUEST_SENT: {{ .Values.config.kafka.topics.joinRequestSent | quote }}
+  KAFKA_TOPICS_JOIN_REQUEST_RESPONDED: {{ .Values.config.kafka.topics.joinRequestResponded | quote }}
+  KAFKA_TOPICS_INVITATION_SENT: {{ .Values.config.kafka.topics.invitationSent | quote }}
+  KAFKA_TOPICS_INVITATION_RESPONDED: {{ .Values.config.kafka.topics.invitationResponded | quote }}
+  KAFKA_TOPICS_EVENT_ATTENDANCE_ACCEPTED: {{ .Values.config.kafka.topics.eventAttendanceAccepted | quote }}
   SENDGRID_FROM_EMAIL: {{ .Values.config.sendgrid.fromEmail | quote }}
   SENDGRID_FROM_NAME: {{ .Values.config.sendgrid.fromName | quote }}
+  USER_SERVICE_BASE_URL: {{ .Values.config.userService.baseUrl | quote }}
+  USER_SERVICE_USER_ENDPOINT: {{ .Values.config.userService.userEndpoint | quote }}
   SPRING_FLYWAY_ENABLED: {{ .Values.config.flyway.enabled | quote }}
+  SWAGGER_ENABLED: {{ .Values.config.swagger.enabled | quote }}
   LOGGING_LEVEL_ROOT: {{ .Values.config.logging.levelRoot | quote }}
   LOGGING_LEVEL_COM_PLANIFY_NOTIFICATION: {{ .Values.config.logging.levelApp | quote }}
   LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB: {{ .Values.config.logging.levelSpringWeb | quote }}
   LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: {{ .Values.config.logging.levelSpringSecurity | quote }}
   LOGGING_LEVEL_ORG_HIBERNATE_SQL: {{ .Values.config.logging.levelHibernateSql | quote }}
-  SPRING_PROFILES_ACTIVE: {{ .Values.config.springProfilesActive | quote }}
