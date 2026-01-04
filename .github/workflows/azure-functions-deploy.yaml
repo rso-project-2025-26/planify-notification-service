@@ -7,7 +7,7 @@ on:
       - 'notification-functions/**'
       - 'notification-core/**'  # Functions depend on core
       - 'pom.xml'
-      - '. github/workflows/azure-functions-deploy.yaml'
+      - '.github/workflows/azure-functions-deploy.yaml'
   workflow_dispatch:  # Allow manual trigger
 
 env:

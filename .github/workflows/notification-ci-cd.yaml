@@ -7,7 +7,7 @@ on:
       - 'notification-core/**'
       - 'pom.xml'
       - 'Dockerfile'
-      - '. github/workflows/notification-ci-cd.yaml'
+      - '.github/workflows/notification-ci-cd.yaml'
 
 env:
   REGISTRY: ghcr.io
