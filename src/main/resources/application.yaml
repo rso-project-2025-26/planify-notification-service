@@ -1,42 +1,42 @@
 server:
-    port: 8083
+    port: ${SERVER_PORT:8083}
 
 spring:
     application:
         name: notification-service
 
     datasource:
-        url: jdbc:postgresql://localhost:5432/planify
-        username: planify
-        password: planify
+        url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/planify}
+        username: ${SPRING_DATASOURCE_USERNAME:planify}
+        password: ${SPRING_DATASOURCE_PASSWORD:planify}
         driver-class-name: org.postgresql.Driver
         hikari:
-            maximum-pool-size: 5
-            minimum-idle: 2
-            connection-timeout: 30000
+            maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:5}
+            minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:2}
+            connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
             idle-timeout: 600000
             max-lifetime: 1800000
 
     jpa:
         hibernate:
-            ddl-auto: validate
+            ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
         properties:
             hibernate:
                 dialect: org.hibernate.dialect.PostgreSQLDialect
-                default_schema: notification
-        show-sql: false
+                default_schema: ${SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA:notification}
+        show-sql: ${SPRING_JPA_SHOW_SQL:false}
 
     flyway:
-        enabled: true
-        schemas: notification
-        default-schema: notification
+        enabled: ${SPRING_FLYWAY_ENABLED:true}
+        schemas: ${SPRING_FLYWAY_SCHEMAS:notification}
+        default-schema: ${SPRING_FLYWAY_DEFAULT_SCHEMA:notification}
         create-schemas: true
 
     kafka:
-        bootstrap-servers: localhost:9092
+        bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
         consumer:
-            group-id: notification-service
-            auto-offset-reset: latest
+            group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:notification-service}
+            auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET:latest}
             key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
         producer:
             key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -45,18 +45,16 @@ spring:
         oauth2:
             resourceserver:
                 jwt:
-                    # Preferred: issuer URI so Spring can auto-configure JwtDecoder
-                    issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:9080/realms/planify}
-                    # Fallback: direct JWK Set URI (kept for flexibility). Must match your Keycloak host/port.
-                    jwk-set-uri: ${OAUTH2_JWK_SET_URI:http://localhost:9080/realms/planify/protocol/openid-connect/certs}
+                    issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:9080/realms/planify}
+                    jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://localhost:9080/realms/planify/protocol/openid-connect/certs}
 
 # SendGrid Configuration
 sendgrid:
     api-key: ${SENDGRID_API_KEY}
-    from-email: katarinagojkovick@gmail.com
-    from-name: Planify Events
+    from-email: ${SENDGRID_FROM_EMAIL:katarinagojkovick@gmail.com}
+    from-name: ${SENDGRID_FROM_NAME:Planify Events}
 
-# Twilio Configuration
+# Vonage Configuration
 vonage:
     api-key: ${VONAGE_API_KEY:84aad65c}
     api-secret: ${VONAGE_API_SECRET:TD7VpEK0MDAFWRBk}
@@ -79,11 +77,11 @@ notification:
 # Kafka Topics
 kafka:
     topics:
-        join-request-sent: ${KAFKA_TOPIC_JOIN_REQUESTS:user.join-request-sent}
-        join-request-responded: ${KAFKA_TOPIC_JOIN_REQUESTS:user.join-request-responded}
-        invitation-sent: ${KAFKA_TOPIC_INVITATIONS:user.invitation-sent}
-        invitation-responded: ${KAFKA_TOPIC_INVITATIONS:user.invitation-responded}
-        event-attendance-accepted: ${KAFKA_TOPIC_EVENT_ATTENDANCE_ACCEPTED:event-attendance-accepted}
+        join-request-sent: ${KAFKA_TOPICS_JOIN_REQUEST_SENT:user.join-request-sent}
+        join-request-responded: ${KAFKA_TOPICS_JOIN_REQUEST_RESPONDED:user.join-request-responded}
+        invitation-sent: ${KAFKA_TOPICS_INVITATION_SENT:user.invitation-sent}
+        invitation-responded: ${KAFKA_TOPICS_INVITATION_RESPONDED:user.invitation-responded}
+        event-attendance-accepted: ${KAFKA_TOPICS_EVENT_ATTENDANCE_ACCEPTED:event-attendance-accepted}
 
 # External services
 user-service:
@@ -94,12 +92,29 @@ management:
     endpoints:
         web:
             exposure:
-                include: health,info,metrics,prometheus
+                include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,metrics,prometheus}
     endpoint:
         health:
             show-details: always
 
-# Resilience4j Configuration for Fault Tolerance
+# Swagger
+springdoc:
+    swagger-ui:
+        path: /swagger-ui.html
+        enabled: ${SWAGGER_ENABLED:true}
+    api-docs:
+        path: /api-docs
+        enabled: ${SWAGGER_ENABLED:true}
+
+logging:
+    level:
+        root: ${LOGGING_LEVEL_ROOT:INFO}
+        com.planify.notification: ${LOGGING_LEVEL_COM_PLANIFY_NOTIFICATION:INFO}
+        org.springframework.web: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB:WARN}
+        org.springframework.security: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY:WARN}
+        org.hibernate.SQL: ${LOGGING_LEVEL_ORG_HIBERNATE_SQL:WARN}
+
+# Resilience4j Configuration
 resilience4j:
     circuitbreaker:
         instances:
