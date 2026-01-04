@@ -99,23 +99,61 @@ management:
         health:
             show-details: always
 
-# Resilience4j retry configuration
+# Resilience4j Configuration for Fault Tolerance
 resilience4j:
-    retry:
+    circuitbreaker:
         instances:
-            smsService:
-                maxAttempts: 3
-                waitDuration: 1s
-                enableExponentialBackoff: true
-                exponentialBackoffMultiplier: 2
-                retryExceptions:
-                    - java.io.IOException
-                    - java.lang.RuntimeException
-            emailService:
-                maxAttempts: 3
-                waitDuration: 1s
-                enableExponentialBackoff: true
-                exponentialBackoffMultiplier: 2
-                retryExceptions:
-                    - java.io.IOException
-                    - java.lang.RuntimeException
+            defaultCircuitBreaker:
+                registerHealthIndicator: true
+                slidingWindowSize: 100
+                minimumNumberOfCalls: 10
+                permittedNumberOfCallsInHalfOpenState: 3
+                automaticTransitionFromOpenToHalfOpenEnabled: true
+                waitDurationInOpenState: 5s
+                failureRateThreshold: 50
+                eventConsumerBufferSize: 10
+
+    retry:
+      instances:
+        smsService:
+          maxAttempts: 3
+          waitDuration: 1s
+          enableExponentialBackoff: true
+          exponentialBackoffMultiplier: 2
+          retryExceptions:
+            - java.io.IOException
+            - java.lang.RuntimeException
+        emailService:
+          maxAttempts: 3
+          waitDuration: 1s
+          enableExponentialBackoff: true
+          exponentialBackoffMultiplier: 2
+          retryExceptions:
+            - java.io.IOException
+            - java.lang.RuntimeException
+        defaultRetry:
+            maxAttempts: 3
+            waitDuration: 1s
+            enableExponentialBackoff: true
+            exponentialBackoffMultiplier: 2
+            retryExceptions:
+                - java.io.IOException
+                - java.lang.RuntimeException
+
+    bulkhead:
+        instances:
+            defaultBulkhead:
+                maxConcurrentCalls: 25
+                maxWaitDuration: 0
+
+    ratelimiter:
+        instances:
+            defaultRateLimiter:
+                limitForPeriod: 100
+                limitRefreshPeriod: 1s
+                timeoutDuration: 0
+
+    timelimiter:
+        instances:
+            defaultTimeLimiter:
+                timeoutDuration: 3s

@@ -41,6 +41,7 @@ public class SecurityConfig {
                         ).permitAll()
                         // Actuator open
                         .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers("/api/resilience/**").permitAll()
                         // WebSocket handshake
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/notifications/**").permitAll()
