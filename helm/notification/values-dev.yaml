@@ -29,6 +29,6 @@ resources:
 
 probes:
   liveness:
-    initialDelaySeconds: 30
+    initialDelaySeconds: 150
   readiness:
-    initialDelaySeconds: 20
+    initialDelaySeconds: 120
