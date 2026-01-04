@@ -78,11 +78,11 @@ jobs:
           
           HTTP_CODE=$(curl -X POST \
             -u "${{ steps.extract-creds.outputs.username }}: ${{ steps.extract-creds.outputs.password }}" \
-            --data-binary @deploy. zip \
+            --data-binary @deploy.zip \
             -H "Content-Type: application/zip" \
             -w "%{http_code}" \
             -o deploy-response.txt \
-            https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm. azurewebsites.net/api/zipdeploy? isAsync=true)
+            https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/zipdeploy?isAsync=true)
           
           echo "HTTP Status Code: $HTTP_CODE"
           
