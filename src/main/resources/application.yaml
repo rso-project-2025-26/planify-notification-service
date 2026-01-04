@@ -56,9 +56,9 @@ sendgrid:
 
 # Vonage Configuration
 vonage:
-    api-key: ${VONAGE_API_KEY:84aad65c}
-    api-secret: ${VONAGE_API_SECRET:TD7VpEK0MDAFWRBk}
-    phone-number: ${VONAGE_PHONE_NUMBER:+38630310696}
+    api-key: ${VONAGE_API_KEY}
+    api-secret: ${VONAGE_API_SECRET}
+    phone-number: ${VONAGE_PHONE_NUMBER}
 
 # Notification Settings
 notification:
