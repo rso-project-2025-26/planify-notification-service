@@ -21,7 +21,7 @@ RUN chmod +x ./mvnw && ./mvnw -q -e -DskipTests clean package -pl notification-c
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-COPY --from=build /app/notification-core/target/*.jar app.jar
+COPY --from=build /app/notification-core/target/*-exec.jar app.jar
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8083/actuator/health || exit 1

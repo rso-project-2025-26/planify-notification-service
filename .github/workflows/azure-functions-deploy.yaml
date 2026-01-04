@@ -7,6 +7,7 @@ on:
       - 'notification-functions/**'
       - 'notification-core/**'  # Functions depend on core
       - 'pom.xml'
+      - '. github/workflows/azure-functions-deploy.yaml'
   workflow_dispatch:  # Allow manual trigger
 
 env:
@@ -38,6 +39,11 @@ jobs:
       - name: Build notification-functions
         run: |
           ./mvnw clean package -DskipTests -pl notification-functions -am
+
+      - name: Verify build output
+        run: |
+          ls -la notification-functions/target/azure-functions/${{ env.AZURE_FUNCTIONAPP_NAME }}/
+          echo "Build artifacts ready for deployment"
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
