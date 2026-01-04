@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: notification-service-test
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/planify
+    username: planify
+    password: planify
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  
+  flyway:
+    enabled: false
+  
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      auto-offset-reset: earliest
+      group-id: notification-service-test
+
+# Disable external services in tests
+notification:
+  email:
+    enabled: false
+  sms:
+    enabled: false
+  push:
+    enabled: false
+
+sendgrid:
+  api-key: ${SENDGRID_API_KEY:test-key}
+
+twilio:
+  account-sid: test-sid
+  auth-token: test-token
+  phone-number: +1234567890
+
+# Kafka Topics
+kafka:
+  topics:
+    join-request-sent: ${KAFKA_TOPIC_JOIN_REQUESTS:user.join-request-sent}
+    join-request-responded: ${KAFKA_TOPIC_JOIN_REQUESTS:user.join-request-responded}
+    invitation-sent: ${KAFKA_TOPIC_INVITATIONS:user.invitation-sent}
+    invitation-responded: ${KAFKA_TOPIC_INVITATIONS:user.invitation-responded}
