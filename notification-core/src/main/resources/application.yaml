@@ -1,5 +1,7 @@
 server:
     port: ${SERVER_PORT:8083}
+    servlet:
+        context-path: ${SERVER_CONTEXT_PATH:/}
 
 spring:
     application:
@@ -96,15 +98,16 @@ management:
     endpoint:
         health:
             show-details: always
-
-# Swagger
 springdoc:
-    swagger-ui:
-        path: /swagger-ui.html
-        enabled: ${SWAGGER_ENABLED:true}
     api-docs:
-        path: /api-docs
+        path: /v3/api-docs
         enabled: ${SWAGGER_ENABLED:true}
+    swagger-ui:
+        path: /swagger-ui/index.html
+        enabled: ${SWAGGER_ENABLED:true}
+        operations-sorter: method
+        tags-sorter: alpha
+        display-request-duration: true
 
 logging:
     level:

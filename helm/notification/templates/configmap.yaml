@@ -29,6 +29,7 @@ data:
   USER_SERVICE_USER_ENDPOINT: {{ .Values.config.userService.userEndpoint | quote }}
   SPRING_FLYWAY_ENABLED: {{ .Values.config.flyway.enabled | quote }}
   SWAGGER_ENABLED: {{ .Values.config.swagger.enabled | quote }}
+  SERVER_CONTEXT_PATH: {{ .Values.config.context.path | quote }}
   LOGGING_LEVEL_ROOT: {{ .Values.config.logging.levelRoot | quote }}
   LOGGING_LEVEL_COM_PLANIFY_NOTIFICATION: {{ .Values.config.logging.levelApp | quote }}
   LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB: {{ .Values.config.logging.levelSpringWeb | quote }}
