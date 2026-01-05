@@ -9,9 +9,6 @@ config:
   
   swagger:
     enabled: "false"
-
-  context:
-    path: "/notification-service"
   
   logging:
     levelRoot: "WARN"
