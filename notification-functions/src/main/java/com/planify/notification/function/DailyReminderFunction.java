@@ -6,6 +6,8 @@ import com.planify.notification.NotificationServiceApplication;
 import com.planify.notification.service.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework. boot.SpringApplication;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework. context.ConfigurableApplicationContext;
 
 import java.time.LocalDateTime;
@@ -38,7 +40,17 @@ public class DailyReminderFunction {
                 log.info("Azure Function cold start - initializing Spring Boot context");
                 long startTime = System.currentTimeMillis();
 
-                ConfigurableApplicationContext applicationContext = SpringApplication.run(NotificationServiceApplication.class);
+                ConfigurableApplicationContext applicationContext =
+                    new SpringApplicationBuilder(NotificationServiceApplication.class)
+                        .web(WebApplicationType.NONE)
+                        .profiles("azure")
+                        .properties(
+                            "spring.autoconfigure.exclude=" +
+                                "org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration," +
+                                "org.springframework.boot.autoconfigure.kafka.KafkaStreamsAutoConfiguration"
+                        )
+                        .properties("spring.kafka.listener.auto-startup=false")
+                        .run();
                 notificationService = applicationContext.getBean(NotificationService.class);
 
                 long duration = System.currentTimeMillis() - startTime;
@@ -60,7 +72,7 @@ public class DailyReminderFunction {
     public void run(
             @TimerTrigger(
                     name = "timerInfo",
-                    schedule = "0 */2 * * * *"  // Vsak dan ob 11:00 AM UTC
+                    schedule = "0 0 11 * * *"  // Vsak dan ob 11:00 AM UTC
             ) String timerInfo,
             ExecutionContext context) {
         totalInvocations++;

@@ -27,6 +27,7 @@
         <dependency>
             <groupId>com.planify</groupId>
             <artifactId>notification-core</artifactId>
+            <version>${project.version}</version>
         </dependency>
         
         <!-- Azure Functions -->
