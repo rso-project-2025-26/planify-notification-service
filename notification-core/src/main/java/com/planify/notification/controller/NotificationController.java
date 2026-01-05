@@ -31,7 +31,8 @@ import java.util.UUID;
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Notification Administration", description = "Manage templates, logs and send test notifications")
+@Tag(name = "Notification Administration", description = "Admin endpoints for managing notification templates and delivery logs")
+@SecurityRequirement(name = "bearer-jwt")
 public class NotificationController {
 
     private final NotificationTemplateRepository templateRepository;
@@ -42,9 +43,15 @@ public class NotificationController {
      * Pridobi seznam vseh templatov za obvestila.
      */
     @GetMapping("/templates")
-    @Operation(summary = "List notification templates", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses(@ApiResponse(responseCode = "200", description = "Templates fetched",
-            content = @Content(schema = @Schema(implementation = NotificationTemplate.class))))
+    @Operation(
+        summary = "Get all notification templates",
+        description = "Returns a list of all notification templates available for email and SMS notifications. Templates include placeholders for dynamic content."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved list of templates",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = NotificationTemplate.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
+    })
     @PreAuthorize("hasAnyRole('ADMINISTRATOR')")
     public ResponseEntity<List<NotificationTemplate>> getAllTemplates() {
         return ResponseEntity.ok(templateRepository.findAll());
@@ -54,23 +61,39 @@ public class NotificationController {
      * Pridobimo določen template na podlagi ID-ja
      */
     @GetMapping("/templates/{id}")
-    @Operation(summary = "Get a template by id", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Template found"),
-            @ApiResponse(responseCode = "404", description = "Not found")
+    @Operation(
+        summary = "Get notification template by ID",
+        description = "Returns detailed information about a specific notification template identified by its UUID."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved template",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = NotificationTemplate.class))),
+        @ApiResponse(responseCode = "404", description = "Template not found", content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('ADMINISTRATOR')")
-    public ResponseEntity<NotificationTemplate> getTemplate(@PathVariable UUID id) {
+    public ResponseEntity<NotificationTemplate> getTemplate(
+            @Parameter(required = true)
+            @PathVariable UUID id) {
         return templateRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/templates")
-    @Operation(summary = "Create a new template", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses(@ApiResponse(responseCode = "201", description = "Created"))
+    @Operation(
+        summary = "Create new notification template",
+        description = "Creates a new notification template with email and SMS variants. Templates support placeholder variables for dynamic content."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Template successfully created",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = NotificationTemplate.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid request body", content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
+    })
     @PreAuthorize("hasAnyRole('ADMINISTRATOR')")
     public ResponseEntity<NotificationTemplate> createTemplate(
+            @Parameter(required = true)
             @RequestBody NotificationTemplateRequest request) {
 
         NotificationTemplate template = new NotificationTemplate();
@@ -87,10 +110,22 @@ public class NotificationController {
     }
 
     @PutMapping("/templates/{id}")
-    @Operation(summary = "Update a template", security = {@SecurityRequirement(name = "roleHeaderAuth")})
+    @Operation(
+        summary = "Update notification template",
+        description = "Updates an existing notification template. Only provided fields will be updated."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Template successfully updated",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = NotificationTemplate.class))),
+        @ApiResponse(responseCode = "404", description = "Template not found", content = @Content),
+        @ApiResponse(responseCode = "400", description = "Invalid request body", content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
+    })
     @PreAuthorize("hasAnyRole('ADMINISTRATOR')")
     public ResponseEntity<NotificationTemplate> updateTemplate(
+            @Parameter(required = true)
             @PathVariable UUID id,
+            @Parameter(required = true)
             @RequestBody NotificationTemplateRequest request) {
 
         return templateRepository.findById(id)
@@ -113,13 +148,19 @@ public class NotificationController {
     }
 
     @DeleteMapping("/templates/{id}")
-    @Operation(summary = "Delete a template", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Deleted"),
-            @ApiResponse(responseCode = "404", description = "Not found")
+    @Operation(
+        summary = "Delete notification template",
+        description = "Permanently deletes a notification template. This action cannot be undone."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "204", description = "Template successfully deleted", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Template not found", content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('ADMINISTRATOR')")
-    public ResponseEntity<Void> deleteTemplate(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteTemplate(
+            @Parameter(required = true)
+            @PathVariable UUID id) {
         if (!templateRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
@@ -131,16 +172,36 @@ public class NotificationController {
     // Notification Logs
 
     @GetMapping("/logs")
-    @Operation(summary = "Paginated notification logs", security = {@SecurityRequirement(name = "roleHeaderAuth")})
+    @Operation(
+        summary = "Get notification delivery logs",
+        description = "Returns paginated notification delivery logs including status, timestamps, and delivery details for email and SMS notifications."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved logs",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = NotificationLog.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
+    })
     @PreAuthorize("hasAnyRole('ADMINISTRATOR')")
-    public ResponseEntity<Page<NotificationLog>> getAllLogs(Pageable pageable) {
+    public ResponseEntity<Page<NotificationLog>> getAllLogs(
+            @Parameter(description = "Pagination parameters (page, size, sort)")
+            Pageable pageable) {
         return ResponseEntity.ok(logRepository.findAll(pageable));
     }
 
     @GetMapping("/logs/user/{userId}")
-    @Operation(summary = "Logs by user id", security = {@SecurityRequirement(name = "roleHeaderAuth")})
+    @Operation(
+        summary = "Get notification logs by user",
+        description = "Returns all notification delivery logs for a specific user, ordered by creation date."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved user logs",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = NotificationLog.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
+    })
     @PreAuthorize("hasAnyRole('ADMINISTRATOR')")
-    public ResponseEntity<List<NotificationLog>> getLogsByUser(@PathVariable UUID userId) {
+    public ResponseEntity<List<NotificationLog>> getLogsByUser(
+            @Parameter(required = true)
+            @PathVariable UUID userId) {
         return ResponseEntity.ok(logRepository.findByUserId(userId));
     }
 }

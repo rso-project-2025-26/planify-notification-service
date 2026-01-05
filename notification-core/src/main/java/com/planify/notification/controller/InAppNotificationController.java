@@ -27,7 +27,8 @@ import java.util.UUID;
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "In-App Notifications", description = "Endpoints for managing user in-app notifications")
+@Tag(name = "In-App Notifications", description = "User-facing endpoints for managing in-app notification feed and real-time updates")
+@SecurityRequirement(name = "bearer-jwt")
 public class InAppNotificationController {
 
     private final InAppNotificationRepository inAppNotificationRepository;
@@ -37,16 +38,20 @@ public class InAppNotificationController {
      * Pridobimo vsa obvestila določenega uporabnika (paginated)
      */
     @GetMapping("/user/{userId}")
-    @Operation(summary = "List user's notifications (paginated)", description = "Returns a page of in-app notifications for the specified user.", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Notifications fetched",
-                    content = @Content(schema = @Schema(implementation = InAppNotification.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "403", description = "Forbidden")
+    @Operation(
+        summary = "Get user's notifications",
+        description = "Returns a paginated list of in-app notifications for the specified user, ordered by creation date descending."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved notifications",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = InAppNotification.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('UPORABNIK','ADMINISTRATOR')")
     public ResponseEntity<Page<InAppNotification>> getUserNotifications(
+            @Parameter(required = true)
             @PathVariable UUID userId,
+            @Parameter(description = "Pagination parameters (page, size, sort)")
             Pageable pageable) {
         Page<InAppNotification> notifications = inAppNotificationRepository
                 .findByUserIdOrderByCreatedAtDesc(userId, pageable);
@@ -57,14 +62,18 @@ public class InAppNotificationController {
      * Pridobimo samo neprebrana sporočila uporabnika
      */
     @GetMapping("/user/{userId}/unread")
-    @Operation(summary = "List user's unread notifications", description = "Returns all unread in-app notifications for the specified user.", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Unread notifications fetched"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "403", description = "Forbidden")
+    @Operation(
+        summary = "Get user's unread notifications",
+        description = "Returns all unread in-app notifications for the specified user, ordered by creation date descending."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved unread notifications",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = InAppNotification.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('UPORABNIK','ADMINISTRATOR')")
     public ResponseEntity<List<InAppNotification>> getUserUnreadNotifications(
+            @Parameter(required = true)
             @PathVariable UUID userId) {
         List<InAppNotification> notifications = inAppNotificationRepository
                 .findByUserIdAndIsReadFalseOrderByCreatedAtDesc(userId);
@@ -75,14 +84,18 @@ public class InAppNotificationController {
      * Pridobimo število neprebranih sporočil uporabnika
      */
     @GetMapping("/user/{userId}/unread/count")
-    @Operation(summary = "Get user's unread notification count", description = "Returns the number of unread notifications for the specified user.", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Count retrieved"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "403", description = "Forbidden")
+    @Operation(
+        summary = "Get unread notification count",
+        description = "Returns the total number of unread notifications for the specified user. Used for notification badges."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved count",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = Long.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('UPORABNIK','ADMINISTRATOR')")
     public ResponseEntity<Long> getUserUnreadNotificationCount(
+            @Parameter(required = true)
             @PathVariable UUID userId) {
         long count = inAppNotificationRepository.countByUserIdAndIsReadFalse(userId);
         return ResponseEntity.ok(count);
@@ -92,13 +105,19 @@ public class InAppNotificationController {
      * Označimo obvestilo kot prebrano
      */
     @PutMapping("/{notificationId}/read")
-    @Operation(summary = "Mark a notification as read", description = "Marks a single in-app notification as read and updates the user's unread count.", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Notification updated"),
-            @ApiResponse(responseCode = "404", description = "Notification not found")
+    @Operation(
+        summary = "Mark notification as read",
+        description = "Marks a single in-app notification as read. Sends real-time update via WebSocket to update the user's unread count."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully marked as read",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = InAppNotification.class))),
+        @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('UPORABNIK','ADMINISTRATOR')")
     public ResponseEntity<InAppNotification> markAsRead(
+            @Parameter(required = true)
             @PathVariable UUID notificationId) {
         return inAppNotificationRepository.findById(notificationId)
                 .map(notification -> {
@@ -121,12 +140,18 @@ public class InAppNotificationController {
      * Oznamčimo vsa obvestila uporabniku kot prebrana
      */
     @PutMapping("/user/{userId}/read-all")
-    @Operation(summary = "Mark all user's notifications as read", description = "Marks all unread in-app notifications for the specified user as read.", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "All notifications marked as read")
+    @Operation(
+        summary = "Mark all notifications as read",
+        description = "Marks all unread notifications for the specified user as read. Sends real-time update via WebSocket."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "All notifications marked as read", content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('UPORABNIK','ADMINISTRATOR')")
-    public ResponseEntity<Void> markAllAsRead(@PathVariable UUID userId) {
+    public ResponseEntity<Void> markAllAsRead(
+            @Parameter(required = true)
+            @PathVariable UUID userId) {
         List<InAppNotification> unreadNotifications = inAppNotificationRepository
                 .findByUserIdAndIsReadFalseOrderByCreatedAtDesc(userId);
         
@@ -148,13 +173,18 @@ public class InAppNotificationController {
      * Izbrišemo obvestilo
      */
     @DeleteMapping("/{notificationId}")
-    @Operation(summary = "Delete a notification", description = "Deletes a single in-app notification.", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Deleted"),
-            @ApiResponse(responseCode = "404", description = "Not found")
+    @Operation(
+        summary = "Delete notification",
+        description = "Permanently deletes a single in-app notification. Sends real-time update via WebSocket to update the user's unread count."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "204", description = "Notification successfully deleted", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('UPORABNIK','ADMINISTRATOR')")
     public ResponseEntity<Void> deleteNotification(
+            @Parameter(required = true)
             @PathVariable UUID notificationId) {
         if (!inAppNotificationRepository.existsById(notificationId)) {
             return ResponseEntity.notFound().build();
@@ -175,12 +205,18 @@ public class InAppNotificationController {
      * Izbrišemo vsa obvestila nekega uporabnika
      */
     @DeleteMapping("/user/{userId}/all")
-    @Operation(summary = "Delete all user's notifications", description = "Deletes all in-app notifications for the specified user.", security = {@SecurityRequirement(name = "roleHeaderAuth")})
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Deleted")
+    @Operation(
+        summary = "Delete all user notifications",
+        description = "Permanently deletes all in-app notifications for the specified user. Sends real-time update via WebSocket."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "204", description = "All notifications successfully deleted", content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token", content = @Content),
     })
     @PreAuthorize("hasAnyRole('UPORABNIK','ADMINISTRATOR')")
-    public ResponseEntity<Void> deleteAllUserNotifications(@Parameter(description = "User ID") @PathVariable UUID userId) {
+    public ResponseEntity<Void> deleteAllUserNotifications(
+            @Parameter(required = true)
+            @PathVariable UUID userId) {
         List<InAppNotification> notifications = inAppNotificationRepository
                 .findByUserIdOrderByCreatedAtDesc(userId);
         
