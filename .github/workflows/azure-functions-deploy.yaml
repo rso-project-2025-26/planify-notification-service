@@ -49,11 +49,13 @@ jobs:
           PUBLISH_PROFILE='${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}'
           
           # Extract Zip Deploy username and password using xmllint
-          USERNAME=$(echo "$PUBLISH_PROFILE" | grep 'publishMethod="ZipDeploy"' | sed -n 's/.*userName="\([^"]*\)".*/\1/p')
-          PASSWORD=$(echo "$PUBLISH_PROFILE" | grep 'publishMethod="ZipDeploy"' | sed -n 's/.*userPWD="\([^"]*\)".*/\1/p')
+          USERNAME=$(echo "$PUBLISH_PROFILE" | grep -A 2 'publishMethod="ZipDeploy"' | grep 'userName=' | sed 's/.*userName="\([^"]*\)".*/\1/')
+          PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -A 2 'publishMethod="ZipDeploy"' | grep 'userPWD=' | sed 's/.*userPWD="\([^"]*\)".*/\1/')
           
           if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-            echo "Failed to extract credentials"
+            echo "Failed to extract credentials from publish profile"
+            echo "Publish profile format:"
+            echo "$PUBLISH_PROFILE" | head -20
             exit 1
           fi
           
