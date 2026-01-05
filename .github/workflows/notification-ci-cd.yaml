@@ -8,6 +8,7 @@ on:
       - 'pom.xml'
       - 'Dockerfile'
       - '.github/workflows/notification-ci-cd.yaml'
+      - 'helm/**'
 
 env:
   REGISTRY: ghcr.io
