@@ -1,18 +1,13 @@
 config:
-  springProfilesActive: "dev"
-  
+  springProfilesActive: "dev"  
   jpa:
-    showSql: "true"
-  
+    showSql: "true"  
   kafka:
-    autoOffsetReset: "earliest"
-  
+    autoOffsetReset: "earliest"  
   swagger:
     enabled: "true"
-
-  context:
-    path: "/notification-service"
-  
+  management:
+    endpointsInclude: "*"
   logging:
     levelRoot: "INFO"
     levelApp: "DEBUG"
