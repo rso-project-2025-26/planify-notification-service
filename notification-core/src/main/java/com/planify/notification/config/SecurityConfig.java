@@ -40,7 +40,11 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/notification-service/v3/api-docs/**",
+                                "/notification-service/api-docs/**",
+                                "/notification-service/swagger-ui/**",
+                                "/notification-service/swagger-ui.html"
                         ).permitAll()
                         // Actuator open
                         .requestMatchers("/actuator/**").permitAll()
