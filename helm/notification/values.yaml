@@ -69,6 +69,8 @@ config:
   flyway:
     enabled: "true"
   swagger:
+  management:
+    endpointsInclude: "health,info,metrics,prometheus"
     enabled: "false"
   logging:
     levelRoot: "INFO"
