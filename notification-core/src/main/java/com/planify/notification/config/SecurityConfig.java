@@ -52,6 +52,7 @@ public class SecurityConfig {
                         // WebSocket handshake
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/notifications/**").permitAll()
+                        .requestMatchers("/api/reminders/**").permitAll()
                         // Vsi ostali endpointi
                         .anyRequest().authenticated()
                 )
