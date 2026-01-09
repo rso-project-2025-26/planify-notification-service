@@ -16,3 +16,6 @@ config:
     levelSpringWeb: "WARN"
     levelSpringSecurity: "WARN"
     levelHibernateSql: "WARN"
+  
+  keycloak:
+    issuerUri: "https://131.189.78.13.nip.io/keycloak/realms/planify"
