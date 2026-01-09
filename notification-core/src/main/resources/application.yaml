@@ -1,0 +1,175 @@
+server:
+    port: ${SERVER_PORT:8083}
+
+spring:
+    application:
+        name: notification-service
+
+    datasource:
+        url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/planify}
+        username: ${SPRING_DATASOURCE_USERNAME:planify}
+        password: ${SPRING_DATASOURCE_PASSWORD:planify}
+        driver-class-name: org.postgresql.Driver
+        hikari:
+            maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:5}
+            minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:2}
+            connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
+            idle-timeout: 600000
+            max-lifetime: 1800000
+
+    jpa:
+        hibernate:
+            ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+                default_schema: ${SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA:notification}
+        show-sql: ${SPRING_JPA_SHOW_SQL:false}
+
+    flyway:
+        enabled: ${SPRING_FLYWAY_ENABLED:true}
+        schemas: ${SPRING_FLYWAY_SCHEMAS:notification}
+        default-schema: ${SPRING_FLYWAY_DEFAULT_SCHEMA:notification}
+        create-schemas: true
+
+    kafka:
+        bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+        consumer:
+            group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:notification-service}
+            auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET:latest}
+            key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        producer:
+            key-serializer: org.apache.kafka.common.serialization.StringSerializer
+            value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:9080/realms/planify}
+                    jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://localhost:9080/realms/planify/protocol/openid-connect/certs}
+
+# SendGrid Configuration
+sendgrid:
+    api-key: ${SENDGRID_API_KEY}
+    from-email: ${SENDGRID_FROM_EMAIL:katarinagojkovick@gmail.com}
+    from-name: ${SENDGRID_FROM_NAME:Planify Events}
+
+# Vonage Configuration
+vonage:
+    api-key: ${VONAGE_API_KEY}
+    api-secret: ${VONAGE_API_SECRET}
+    phone-number: ${VONAGE_PHONE_NUMBER}
+
+# Notification Settings
+notification:
+    email:
+        enabled: true
+        retry-attempts: 3
+    sms:
+        enabled: true
+        retry-attempts: 3
+    websocket:
+        enabled: true
+    reminder:
+        check-interval-minutes: 30
+        advance-notice-hours: 24
+
+# Kafka Topics
+kafka:
+    topics:
+        join-request-sent: ${KAFKA_TOPICS_JOIN_REQUEST_SENT:user.join-request-sent}
+        join-request-responded: ${KAFKA_TOPICS_JOIN_REQUEST_RESPONDED:user.join-request-responded}
+        invitation-sent: ${KAFKA_TOPICS_INVITATION_SENT:user.invitation-sent}
+        invitation-responded: ${KAFKA_TOPICS_INVITATION_RESPONDED:user.invitation-responded}
+        event-attendance-accepted: ${KAFKA_TOPICS_EVENT_ATTENDANCE_ACCEPTED:event-attendance-accepted}
+
+# External services
+user-service:
+    base-url: ${USER_SERVICE_BASE_URL:http://localhost:8082}
+    user-endpoint: ${USER_SERVICE_USER_ENDPOINT:/api/users/{id}}
+
+management:
+    endpoints:
+        web:
+            exposure:
+                include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,metrics,prometheus}
+    endpoint:
+        health:
+            show-details: always
+springdoc:
+    api-docs:
+        path: /v3/api-docs
+        enabled: ${SWAGGER_ENABLED:true}
+    swagger-ui:
+        path: /swagger-ui/index.html
+        enabled: ${SWAGGER_ENABLED:true}
+        operations-sorter: method
+        tags-sorter: alpha
+        display-request-duration: true
+
+logging:
+    level:
+        root: ${LOGGING_LEVEL_ROOT:INFO}
+        com.planify.notification: ${LOGGING_LEVEL_COM_PLANIFY_NOTIFICATION:INFO}
+        org.springframework.web: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB:WARN}
+        org.springframework.security: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY:WARN}
+        org.hibernate.SQL: ${LOGGING_LEVEL_ORG_HIBERNATE_SQL:WARN}
+
+# Resilience4j Configuration
+resilience4j:
+    circuitbreaker:
+        instances:
+            defaultCircuitBreaker:
+                registerHealthIndicator: true
+                slidingWindowSize: 100
+                minimumNumberOfCalls: 10
+                permittedNumberOfCallsInHalfOpenState: 3
+                automaticTransitionFromOpenToHalfOpenEnabled: true
+                waitDurationInOpenState: 5s
+                failureRateThreshold: 50
+                eventConsumerBufferSize: 10
+
+    retry:
+      instances:
+        smsService:
+          maxAttempts: 3
+          waitDuration: 1s
+          enableExponentialBackoff: true
+          exponentialBackoffMultiplier: 2
+          retryExceptions:
+            - java.io.IOException
+            - java.lang.RuntimeException
+        emailService:
+          maxAttempts: 3
+          waitDuration: 1s
+          enableExponentialBackoff: true
+          exponentialBackoffMultiplier: 2
+          retryExceptions:
+            - java.io.IOException
+            - java.lang.RuntimeException
+        defaultRetry:
+            maxAttempts: 3
+            waitDuration: 1s
+            enableExponentialBackoff: true
+            exponentialBackoffMultiplier: 2
+            retryExceptions:
+                - java.io.IOException
+                - java.lang.RuntimeException
+
+    bulkhead:
+        instances:
+            defaultBulkhead:
+                maxConcurrentCalls: 25
+                maxWaitDuration: 0
+
+    ratelimiter:
+        instances:
+            defaultRateLimiter:
+                limitForPeriod: 100
+                limitRefreshPeriod: 1s
+                timeoutDuration: 0
+
+    timelimiter:
+        instances:
+            defaultTimeLimiter:
+                timeoutDuration: 3s

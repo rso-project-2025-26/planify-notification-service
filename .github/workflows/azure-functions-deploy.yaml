@@ -1,0 +1,121 @@
+name: Azure Functions - Deploy
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'notification-functions/**'
+      - 'notification-core/**'  # Functions depend on core
+      - 'pom.xml'
+      - '.github/workflows/azure-functions-deploy.yaml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AZURE_FUNCTIONAPP_NAME: planify-reminder-function
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: notification-functions
+  JAVA_VERSION: '21'
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Azure Functions
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+          
+      - name: Build notification-core (dependency)
+        run: |
+          chmod +x mvnw
+          ./mvnw clean install -DskipTests -pl notification-core -am
+
+      - name: Build notification-functions
+        run: |
+          ./mvnw clean package -DskipTests -pl notification-functions -am
+
+      - name: Verify build output
+        run: |
+          ls -la notification-functions/target/azure-functions/${{ env.AZURE_FUNCTIONAPP_NAME }}/
+      - name: Extract Zip Deploy credentials
+        id: extract-creds
+        run: |
+          PUBLISH_PROFILE='${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}'
+          
+          # Extract Zip Deploy username and password using xmllint
+          USERNAME=$(echo "$PUBLISH_PROFILE" | grep -A 2 'publishMethod="ZipDeploy"' | grep 'userName=' | sed 's/.*userName="\([^"]*\)".*/\1/')
+          PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -A 2 'publishMethod="ZipDeploy"' | grep 'userPWD=' | sed 's/.*userPWD="\([^"]*\)".*/\1/')
+          
+          if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+            echo "Failed to extract credentials from publish profile"
+            echo "Publish profile format:"
+            echo "$PUBLISH_PROFILE" | head -20
+            exit 1
+          fi
+          
+          echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "::add-mask::$PASSWORD"
+          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+          
+          echo "Credentials extracted successfully"
+
+      - name:  Create deployment ZIP
+        run: |
+          cd notification-functions/target/azure-functions/${{ env. AZURE_FUNCTIONAPP_NAME }}
+          zip -r ../../../../deploy.zip .
+          cd ../../../../
+          
+          echo "Deployment package size:"
+          ls -lh deploy.zip
+
+      - name: Deploy to Azure Functions via Kudu API
+        run:  |
+          echo "Deploying to Azure Functions..."
+          
+          HTTP_CODE=$(curl -X POST \
+            -u "${{ steps.extract-creds.outputs.username }}: ${{ steps.extract-creds.outputs.password }}" \
+            --data-binary @deploy.zip \
+            -H "Content-Type: application/zip" \
+            -w "%{http_code}" \
+            -o deploy-response.txt \
+            https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/zipdeploy?isAsync=true)
+          
+          echo "HTTP Status Code: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" -eq 202 ] || [ "$HTTP_CODE" -eq 200 ]; then
+            echo "Deployment initiated successfully"
+          else
+            echo "Deployment failed with status code $HTTP_CODE"
+            cat deploy-response.txt
+            exit 1
+          fi
+
+      - name: Wait for deployment to complete
+        run:  |
+          echo "Waiting for deployment to complete (60 seconds)..."
+          sleep 60
+
+      - name: Verify deployment
+        run: |
+          echo "Testing function app..."
+          
+          # Test health endpoint
+          for i in {1..5}; do
+            echo "Attempt $i/5..."
+            if curl -f -s https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/health; then
+              echo ""
+              echo "Function app is responding!"
+              exit 0
+            fi
+            echo "Waiting 10 seconds before retry..."
+            sleep 10
+          done
+          
+          echo "Health check didn't respond (function may still be cold starting)"
+          echo "Manual check: https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/health"

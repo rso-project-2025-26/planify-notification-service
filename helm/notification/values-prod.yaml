@@ -1,0 +1,21 @@
+config:
+  springProfilesActive: "prod"
+  
+  jpa:
+    showSql: "false"
+  
+  kafka:
+    autoOffsetReset: "latest"
+  
+  swagger:
+    enabled: "false"
+  
+  logging:
+    levelRoot: "WARN"
+    levelApp: "INFO"
+    levelSpringWeb: "WARN"
+    levelSpringSecurity: "WARN"
+    levelHibernateSql: "WARN"
+  
+  keycloak:
+    issuerUri: "https://131.189.78.13.nip.io/keycloak/realms/planify"

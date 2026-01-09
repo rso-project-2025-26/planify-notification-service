@@ -1,0 +1,41 @@
+# Azure Functions Application Configuration
+# This configures Spring Boot for Azure Functions environment
+
+spring:
+  application:
+    name: notification-functions
+  
+  # Minimal Spring Boot for Azure Functions
+  main:
+    web-application-type: none
+    banner-mode: off
+  
+  # Disable auto-configs not needed in Azure Functions to avoid unnecessary bean initialization
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
+  
+  # Configure data source to connect to the same database
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/planify}
+    username: ${SPRING_DATASOURCE_USERNAME:planify}
+    password: ${SPRING_DATASOURCE_PASSWORD:planify}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: notification
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.planify.notification: DEBUG
+    com.microsoft.azure.functions: INFO
