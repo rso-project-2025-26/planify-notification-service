@@ -2,66 +2,36 @@ package com.planify.notification.function;
 
 import com.microsoft.azure.functions.*;
 import com.microsoft.azure.functions.annotation.*;
-import com.planify.notification.NotificationServiceApplication;
-import com.planify.notification.service.NotificationService;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework. boot.SpringApplication;
-import org.springframework.boot.WebApplicationType;
-import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework. context.ConfigurableApplicationContext;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Azure Function za dnevno pošiljanje SMS opomnikov
  * Sproži se vsak dan ob 11:00 AM UTC z uporabo Timer Trigger
  */
-@Slf4j
 public class DailyReminderFunction {
+    private static final Logger logger = Logger.getLogger(DailyReminderFunction.class.getName());
 
-    private static NotificationService notificationService;
-    private static boolean initialized = false;
+    private static final String BACKEND_URL = System.getenv()
+            .getOrDefault("USER_SERVICE_BASE_URL", "http://localhost:8082");
+
+    private static final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
     // Metrics tracking
     private static long totalInvocations = 0;
     private static long successfulInvocations = 0;
     private static long failedInvocations = 0;
-
-    // Cold start initialization
-    static {
-        initializeSpringContext();
-    }
-
-    private static synchronized void initializeSpringContext() {
-        if (!initialized) {
-            try {
-                log.info("Azure Function cold start - initializing Spring Boot context");
-                long startTime = System.currentTimeMillis();
-
-                ConfigurableApplicationContext applicationContext =
-                    new SpringApplicationBuilder(NotificationServiceApplication.class)
-                        .web(WebApplicationType.NONE)
-                        .profiles("azure")
-                        .properties(
-                            "spring.autoconfigure.exclude=" +
-                                "org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration," +
-                                "org.springframework.boot.autoconfigure.kafka.KafkaStreamsAutoConfiguration"
-                        )
-                        .properties("spring.kafka.listener.auto-startup=false")
-                        .run();
-                notificationService = applicationContext.getBean(NotificationService.class);
-
-                long duration = System.currentTimeMillis() - startTime;
-                log. info("Spring context initialized successfully in {}ms", duration);
-                initialized = true;
-            } catch (Exception e) {
-                log.error("FATAL: Failed to initialize Spring context", e);
-                throw new RuntimeException("Azure Function initialization failed", e);
-            }
-        }
-    }
 
     /**
      * Timer Trigger: Vsak dan ob 11:00 AM UTC
@@ -76,37 +46,61 @@ public class DailyReminderFunction {
             ) String timerInfo,
             ExecutionContext context) {
         totalInvocations++;
-        log.info("Azure Function triggered at:  {}", LocalDateTime.now());
-        log.info("Invocation ID: {}", context.getInvocationId());
-        log.info("Total invocations: {}", totalInvocations);
+        logger.info("Azure Function triggered at: " + LocalDateTime.now());
+        logger.info("Invocation ID: " + context.getInvocationId());
+        logger.info("Total invocations: " + totalInvocations);
 
         long executionStart = System.currentTimeMillis();
-        int remindersSent = 0;
 
         try {
-            if (notificationService == null) {
-                throw new IllegalStateException("NotificationService not initialized");
-            }
+            // Call Notification Service REST API
+            String endpoint = BACKEND_URL + "/api/reminders/send";
+            logger.info("Calling notification service: " + endpoint);
 
-            log.info("Starting reminder processing.. .");
-            remindersSent = notificationService.sendScheduledReminders();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent", "Azure-Function-Reminder-Trigger/1.0")
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request,
+                    HttpResponse.BodyHandlers.ofString());
 
             long executionTime = System.currentTimeMillis() - executionStart;
 
-            successfulInvocations++;
-            log.info("METRIC: execution_duration_ms={}", executionTime);
-            log.info("METRIC: reminders_sent={}", remindersSent);
-            log.info("METRIC: success_rate={}", (double)successfulInvocations / totalInvocations * 100);
-            log.info("Reminders processed successfully in {}ms", executionTime);
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                successfulInvocations++;
 
-        } catch (Exception e) {
+                // Parse response (should be integer - number of reminders sent)
+                String remindersSent = response.body();
+
+                successfulInvocations++;
+                logger.info("METRIC: execution_duration_ms=" + executionTime);
+                logger.info("METRIC: reminders_sent=" + remindersSent);
+                logger.info("METRIC: success_rate=" + (double)successfulInvocations / totalInvocations * 100);
+                logger.info("Reminders processed successfully in " + executionTime + "ms");
+
+            } else {
+                failedInvocations++;
+                logger.severe("Notification service returned error status: " + response.statusCode());
+                logger.severe("Response body: " + response.body());
+                logger.severe("METRIC: execution_duration_ms=" + executionTime);
+                logger.severe("METRIC: failure_rate=" +
+                        String.format("%.2f", (double)failedInvocations / totalInvocations * 100));
+                throw new RuntimeException("Notification service returned status " + response.statusCode());
+            }
+
+        } catch (IOException | InterruptedException e) {
             failedInvocations++;
             long executionTime = System.currentTimeMillis() - executionStart;
 
             // DODAJ: Log failure metrics
-            log.error("METRIC: execution_failed=true");
-            log.error("METRIC: failure_rate={}", (double)failedInvocations / totalInvocations * 100);
-            log.error("✗ Error processing scheduled reminders after {}ms", executionTime, e);
+            logger.severe("METRIC: execution_failed=true");
+            logger.severe("METRIC: failure_rate=" + (double)failedInvocations / totalInvocations * 100);
+            logger.severe("✗ Error processing scheduled reminders after " + executionTime + "ms");
+            logger.severe("ERROR: " + e.getMessage());
             throw new RuntimeException("Failed to process reminders", e);
         }
     }
@@ -125,51 +119,85 @@ public class DailyReminderFunction {
         totalInvocations++;
         long startTime = System.currentTimeMillis();
 
-        log.info("Manual reminder trigger invoked (Invocation:  {})", totalInvocations);
+        logger.info("Manual reminder trigger invoked (Invocation:  " + totalInvocations + ")");
 
         try {
-            if (notificationService == null) {
-                throw new IllegalStateException("NotificationService not initialized");
-            }
+            String endpoint = BACKEND_URL + "/api/reminders/send";
+            logger.info("Calling notification service: " + endpoint);
 
-            notificationService.sendScheduledReminders();
-
-            long duration = System.currentTimeMillis() - startTime;
-            successfulInvocations++;
-
-            // DODAJ: Log metrics
-            log.info("METRIC: manual_trigger_duration_ms={}", duration);
-            log.info("METRIC: manual_trigger_success=true");
-
-            Map<String, Object> response = new HashMap<>();
-            response. put("status", "success");
-            response. put("message", "Reminders processed successfully");
-            response.put("timestamp", LocalDateTime.now().toString());
-            response.put("duration_ms", duration);
-            response.put("invocation_count", totalInvocations);
-            response.put("success_rate", String.format("%.2f%%", (double)successfulInvocations / totalInvocations * 100));
-
-            return request.createResponseBuilder(HttpStatus.OK)
-                    .body(response)
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
                     .header("Content-Type", "application/json")
+                    .header("User-Agent", "Azure-Function-Manual-Trigger/1.0")
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
                     .build();
 
-        } catch (Exception e) {
+            HttpResponse<String> response = httpClient.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            long duration = System.currentTimeMillis() - startTime;
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                successfulInvocations++;
+
+                Map<String, Object> responseBody = new HashMap<>();
+                responseBody.put("status", "success");
+                responseBody.put("message", "Reminders triggered successfully");
+                responseBody.put("remindersSent", response.body());
+                responseBody.put("timestamp", LocalDateTime.now().toString());
+                responseBody.put("durationMs", duration);
+                responseBody.put("invocationCount", totalInvocations);
+                responseBody.put("successRate", String.format("%.2f%%",
+                        (double)successfulInvocations / totalInvocations * 100));
+
+                logger.info("Manual trigger successful in " + duration + "ms");
+                logger.info("METRIC: manual_trigger_duration_ms=" + duration);
+                logger.info("METRIC: manual_trigger_success=true");
+
+                return request.createResponseBuilder(HttpStatus.OK)
+                        .body(responseBody)
+                        .header("Content-Type", "application/json")
+                        .build();
+            } else {
+                failedInvocations++;
+
+                Map<String, Object> errorBody = new HashMap<>();
+                errorBody.put("status", "error");
+                errorBody.put("message", "Notification service returned error");
+                errorBody.put("statusCode", response.statusCode());
+                errorBody.put("serviceResponse", response.body());
+                errorBody.put("timestamp", LocalDateTime.now().toString());
+                errorBody.put("durationMs", duration);
+
+                logger.severe("Manual trigger failed: status " + response.statusCode());
+                logger.severe("METRIC: manual_trigger_duration_ms=" + duration);
+                logger.severe("METRIC: manual_trigger_failed=true");
+
+                return request.createResponseBuilder(HttpStatus.valueOf(response.statusCode()))
+                        .body(errorBody)
+                        .header("Content-Type", "application/json")
+                        .build();
+            }
+
+        } catch (IOException | InterruptedException e) {
             failedInvocations++;
             long duration = System.currentTimeMillis() - startTime;
 
-            // DODAJ: Log failure
-            log.error("METRIC:  manual_trigger_duration_ms={}", duration);
-            log.error("METRIC: manual_trigger_failed=true");
-            log.error("Error in manual reminder trigger", e);
+            logger.severe("Manual trigger failed after " + duration);
+            logger.severe("ERROR: " + e.getMessage());
+            logger.severe("METRIC: manual_trigger_duration_ms=" + duration);
+            logger.severe("METRIC: manual_trigger_failed=true");
 
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("status", "error");
-            errorResponse.put("message", e.getMessage());
-            errorResponse. put("timestamp", LocalDateTime.now().toString());
+            Map<String, Object> errorBody = new HashMap<>();
+            errorBody.put("status", "error");
+            errorBody.put("message", e.getMessage());
+            errorBody.put("errorType", e.getClass().getSimpleName());
+            errorBody.put("timestamp", LocalDateTime.now().toString());
+            errorBody.put("durationMs", duration);
 
             return request.createResponseBuilder(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(errorResponse)
+                    .body(errorBody)
                     .header("Content-Type", "application/json")
                     .build();
         }
@@ -186,19 +214,40 @@ public class DailyReminderFunction {
                     authLevel = AuthorizationLevel.ANONYMOUS,
                     route = "health"
             ) HttpRequestMessage<String> request,
-            final ExecutionContext context) {
+            ExecutionContext context) {
 
         Map<String, Object> health = new HashMap<>();
         health.put("status", "healthy");
-        health.put("service", "notification-reminder");
+        health.put("service", "notification-reminder-function");
+        health.put("version", "2.0-lightweight");
         health.put("timestamp", LocalDateTime.now().toString());
-        health.put("spring_initialized", initialized);
-        health.put("total_invocations", totalInvocations);
-        health.put("successful_invocations", successfulInvocations);
-        health.put("failed_invocations", failedInvocations);
+        health.put("backendUrl", BACKEND_URL);
+        health.put("totalInvocations", totalInvocations);
+        health.put("successfulInvocations", successfulInvocations);
+        health.put("failedInvocations", failedInvocations);
 
         if (totalInvocations > 0) {
-            health. put("success_rate", String.format("%. 2f%%", (double)successfulInvocations / totalInvocations * 100));
+            health.put("successRate", String.format("%.2f%%",
+                    (double)successfulInvocations / totalInvocations * 100));
+        }
+
+        // Test connectivity to backend
+        try {
+            String endpoint = BACKEND_URL + "/actuator/health";
+            HttpRequest testRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .GET()
+                    .timeout(Duration.ofSeconds(5))
+                    .build();
+
+            HttpResponse<String> testResponse = httpClient.send(testRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            health.put("backendConnectivity", testResponse.statusCode() == 200 ? "OK" : "ERROR");
+            health.put("backendStatus", testResponse.statusCode());
+        } catch (Exception e) {
+            health.put("backendConnectivity", "ERROR");
+            health.put("backendError", e.getMessage());
         }
 
         return request.createResponseBuilder(HttpStatus.OK)
