@@ -46,7 +46,7 @@ public class UserDirectoryClient {
         return null;
     }
 
-    private String getUserPhoneFallback(UUID userId, Exception ex) {
+    private UserResponse getUserPhoneFallback(UUID userId, Exception ex) {
         log.error("User-service is unavailable. Cannot fetch phone for user {}. Error: {}",
                   userId, ex.getMessage());
         // Vračamo null, notifikacija ne bo poslana
