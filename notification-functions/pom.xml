@@ -3,17 +3,17 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    
+
     <parent>
         <groupId>com.planify</groupId>
         <artifactId>notification-service-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    
+
     <artifactId>notification-functions</artifactId>
     <packaging>jar</packaging>
-    <name>Notification Service - Azure Functions</name>
-    <description>Azure Functions for scheduled notifications</description>
+    <name>Notification Service - Azure Functions (Lightweight)</name>
+    <description>Lightweight Azure Functions for triggering notifications via HTTP - NO Spring Boot!</description>
 
     <properties>
         <java.version>21</java.version>
@@ -23,34 +23,26 @@
     </properties>
 
     <dependencies>
-        <!-- Depend on the core module -->
-        <dependency>
-            <groupId>com.planify</groupId>
-            <artifactId>notification-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        
-        <!-- Azure Functions -->
+        <!-- Azure Functions - ONLY dependency needed! -->
         <dependency>
             <groupId>com.microsoft.azure.functions</groupId>
             <artifactId>azure-functions-java-library</artifactId>
         </dependency>
-        
-        <!-- Lombok -->
+
+        <!-- Lombok for cleaner code (optional) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-        
-        <!-- Testing -->
+
+        <!-- SLF4J API for logging -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
     </dependencies>
-    
+
     <build>
         <plugins>
             <plugin>
@@ -61,7 +53,7 @@
                     <target>21</target>
                 </configuration>
             </plugin>
-            
+
             <!-- Azure Functions Plugin -->
             <plugin>
                 <groupId>com.microsoft.azure</groupId>
@@ -93,28 +85,6 @@
                         <goals>
                             <goal>package</goal>
                         </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            
-            <!-- Maven Dependency Plugin - copy core JAR -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>copy-dependencies</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>copy-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/azure-functions/${project.artifactId}/lib</outputDirectory>
-                            <overWriteReleases>false</overWriteReleases>
-                            <overWriteSnapshots>false</overWriteSnapshots>
-                            <overWriteIfNewer>true</overWriteIfNewer>
-                            <includeScope>runtime</includeScope>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
