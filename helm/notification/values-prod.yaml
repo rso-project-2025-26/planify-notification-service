@@ -17,5 +17,5 @@ config:
     levelSpringSecurity: "WARN"
     levelHibernateSql: "WARN"
   
-  keycloak:
+  oauth2:
     issuerUri: "https://131.189.78.13.nip.io/keycloak/realms/planify"
